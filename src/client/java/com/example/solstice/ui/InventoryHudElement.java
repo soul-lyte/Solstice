@@ -1,5 +1,6 @@
 package com.example.solstice.ui;
 
+import com.example.solstice.SolsticeMod;
 import com.example.solstice.core.hud.HudElement;
 import com.example.solstice.core.hud.HudLayoutManager;
 import com.example.solstice.qol.inventoryhud.InventoryHudModule;
@@ -24,12 +25,13 @@ import java.util.List;
  * Deliberately doesn't touch its separate potion/armor HUD sub-features -
  * Solstice already has its own {@link ArmorHudElement}.
  *
- * <p>No "Edit" button in {@code HudEditorScreen} (see its {@code
- * hasEditButton}) - same treatment as {@link BossBarHudElement}: only
- * position/size and visibility are configurable, no background or text
- * color, since this element never draws a background of its own (fully
- * transparent) and its item-count/durability overlays use vanilla's own
- * fixed colors.</p>
+ * <p>No "Edit" button and no "Visible" checkbox in {@code HudEditorScreen}
+ * (see its {@code hasEditButton}/{@code hasVisibilityToggle}) - only
+ * position/size are configurable here. This element's on/off switch is
+ * {@link InventoryHudModule}'s own enable state, not a separate flag, and
+ * it never draws a background or text color of its own (fully
+ * transparent; item-count/durability overlays use vanilla's own fixed
+ * colors).</p>
  */
 public final class InventoryHudElement implements HudElement {
 
@@ -38,7 +40,7 @@ public final class InventoryHudElement implements HudElement {
     private static final int SLOT_SIZE = 18;
     private static final int COLS = 9;
     private static final int STORAGE_ROWS = 3;
-    private static final int HOTBAR_GAP = 3;
+    private static final int HOTBAR_GAP = 4;
 
     /** Shown in the HUD editor instead of the real (possibly empty/varied) inventory, so positioning has a consistent full grid to work with. */
     private static final List<ItemStack> PREVIEW_STACKS = buildPreviewStacks();
@@ -52,12 +54,6 @@ public final class InventoryHudElement implements HudElement {
     @Override public int getWidth()          { return COLS * SLOT_SIZE; }
     @Override public int getHeight()         { return STORAGE_ROWS * SLOT_SIZE + HOTBAR_GAP + SLOT_SIZE; }
 
-    /**
-     * True, unlike most off-by-default elements - {@link InventoryHudModule}'s own
-     * enable state is already the real on/off switch for this feature, so a second,
-     * independent "Visible" toggle in the HUD editor would just be a hidden extra
-     * step between enabling the module and actually seeing anything.
-     */
     @Override public boolean isVisibleByDefault() { return true; }
 
     @Override
@@ -70,14 +66,33 @@ public final class InventoryHudElement implements HudElement {
         return 4;
     }
 
-    /** Called from {@code SolsticeClient} via {@code HudRenderCallback.EVENT}. */
+    /** Last-logged combined visibility, so gate state is only logged on an actual change, not every frame. */
+    private Boolean lastLoggedVisible;
+
+    /**
+     * Called from {@code SolsticeClient} via {@code HudRenderCallback.EVENT}.
+     *
+     * <p>Deliberately does NOT also gate on {@code HudLayoutManager.isVisible(getId(), ...)} -
+     * {@link InventoryHudModule}'s own enable state is the one real on/off switch for this
+     * feature (see its Javadoc); a second, independently-persisted "Visible" flag risked going
+     * stale from before this element's default visibility changed, silently keeping it hidden
+     * even with the module on and no way to tell why. The HUD editor's per-element checkbox
+     * still exists for every element uniformly, it just has no effect on this one.</p>
+     */
     public void onHudRender(DrawContext context, RenderTickCounter tickCounter) {
         MinecraftClient client = MinecraftClient.getInstance();
 
-        boolean visible = HudLayoutManager.getInstance().isMasterVisible()
-                && client.currentScreen == null
-                && InventoryHudModule.getInstance().isEnabled()
-                && HudLayoutManager.getInstance().isVisible(getId(), isVisibleByDefault());
+        boolean masterVisible = HudLayoutManager.getInstance().isMasterVisible();
+        boolean noScreenOpen = client.currentScreen == null;
+        boolean moduleEnabled = InventoryHudModule.getInstance().isEnabled();
+        boolean visible = masterVisible && noScreenOpen && moduleEnabled;
+
+        if (lastLoggedVisible == null || lastLoggedVisible != visible) {
+            lastLoggedVisible = visible;
+            SolsticeMod.LOGGER.info("[Solstice] Inventory HUD: masterVisible={}, noScreenOpen={}, moduleEnabled={} -> visible={}",
+                    masterVisible, noScreenOpen, moduleEnabled, visible);
+        }
+
         if (!visible) {
             return;
         }
@@ -98,8 +113,17 @@ public final class InventoryHudElement implements HudElement {
 
         int boxW = HudLayoutManager.getInstance().getWidth(getId(), getWidth());
         int boxH = HudLayoutManager.getInstance().getHeight(getId(), getHeight());
-        HudLayoutManager.withContentScale(context, x, y, getWidth(), getHeight(), boxW, boxH,
-                () -> drawGrid(context, client, x, y, stacks));
+
+        // A single uniform scale (not withContentScale's independent X/Y stretch) - resizing
+        // this element should zoom the grid in/out, never distort its square item icons.
+        float scale = Math.min((float) boxW / getWidth(), (float) boxH / getHeight());
+
+        context.getMatrices().pushMatrix();
+        context.getMatrices().translate(x, y);
+        context.getMatrices().scale(scale, scale);
+        context.getMatrices().translate(-x, -y);
+        drawGrid(context, client, x, y, stacks);
+        context.getMatrices().popMatrix();
     }
 
     private void drawGrid(DrawContext context, MinecraftClient client, int x, int y, List<ItemStack> stacks) {

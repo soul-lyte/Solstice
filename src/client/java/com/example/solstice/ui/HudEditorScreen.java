@@ -71,7 +71,7 @@ public class HudEditorScreen extends Screen {
             int y = dragging ? dragY : layout.getY(id, defaultY);
             int w = resizing ? liveW : layout.getWidth(id, element.getWidth());
             int h = resizing ? liveH : layout.getHeight(id, element.getHeight());
-            boolean visible = layout.isVisible(id, element.isVisibleByDefault());
+            boolean visible = !hasVisibilityToggle(element) || layout.isVisible(id, element.isVisibleByDefault());
 
             if (visible) {
                 element.render(context, x, y);
@@ -84,10 +84,12 @@ public class HudEditorScreen extends Screen {
             context.drawText(textRenderer, element.getDisplayName(), x, y - 10,
                     visible ? ColorPalette.TEXT_PRIMARY : ColorPalette.TEXT_DISABLED, true);
 
-            int[] toggleRect = toggleRect(element, x, y, w);
-            SolsticeTheme.fillRect(context, toggleRect[0], toggleRect[1], toggleRect[2], toggleRect[3],
-                    visible ? ColorPalette.ACCENT_NEUTRAL : ColorPalette.BG_CARD);
-            SolsticeTheme.drawBorder(context, toggleRect[0], toggleRect[1], toggleRect[2], toggleRect[3], ColorPalette.BORDER_DEFAULT);
+            if (hasVisibilityToggle(element)) {
+                int[] toggleRect = toggleRect(element, x, y, w);
+                SolsticeTheme.fillRect(context, toggleRect[0], toggleRect[1], toggleRect[2], toggleRect[3],
+                        visible ? ColorPalette.ACCENT_NEUTRAL : ColorPalette.BG_CARD);
+                SolsticeTheme.drawBorder(context, toggleRect[0], toggleRect[1], toggleRect[2], toggleRect[3], ColorPalette.BORDER_DEFAULT);
+            }
 
             if (hasEditButton(element)) {
                 int[] editRect = editButtonRect(x, y, w);
@@ -116,7 +118,7 @@ public class HudEditorScreen extends Screen {
             int w = layout.getWidth(id, element.getWidth());
             int h = layout.getHeight(id, element.getHeight());
 
-            if (contains(toggleRect(element, x, y, w), mx, my)) {
+            if (hasVisibilityToggle(element) && contains(toggleRect(element, x, y, w), mx, my)) {
                 boolean current = layout.isVisible(id, element.isVisibleByDefault());
                 layout.setVisible(id, !current);
                 return true;
@@ -187,6 +189,15 @@ public class HudEditorScreen extends Screen {
      */
     private boolean hasEditButton(HudElement element) {
         return !(element instanceof BossBarHudElement) && !(element instanceof InventoryHudElement);
+    }
+
+    /**
+     * Inventory HUD's own module enable state is the one real on/off switch for it (see its
+     * Javadoc) - a separate, independently-persisted "Visible" checkbox here would just be a
+     * second flag that can silently go stale and keep it hidden with no way to tell why.
+     */
+    private boolean hasVisibilityToggle(HudElement element) {
+        return !(element instanceof InventoryHudElement);
     }
 
     private int[] editButtonRect(int x, int y, int w) {
