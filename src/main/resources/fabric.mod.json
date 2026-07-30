@@ -8,11 +8,11 @@
     "zSouul"
   ],
   "contact": {
-    "homepage": "https://github.com/soul-lyte/solstice",
-    "sources":  "https://github.com/soul-lyte/solstice",
-    "issues":   "https://github.com/soul-lyte/solstice/issues"
+    "homepage": "https://github.com/soul-lyte/Solstice",
+    "sources":  "https://github.com/soul-lyte/Solstice",
+    "issues":   "https://github.com/soul-lyte/Solstice/issues"
   },
-  "license": ["MIT", "LGPL-3.0-only", "MPL-2.0"],
+  "license": ["MIT", "LGPL-3.0-only", "MPL-2.0", "Apache-2.0"],
   "icon": "assets/solstice/icon.png",
   "environment": "client",
   "accessWidener": "solstice.accesswidener",
@@ -30,7 +30,7 @@
   ],
   "depends": {
     "fabricloader": ">=0.19.3",
-    "fabric-api":   "*",
+    "fabric-api":   ">=0.141.4",
     "minecraft":    "1.21.11",
     "java":         ">=21"
   },
