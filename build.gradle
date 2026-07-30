@@ -1,0 +1,80 @@
+plugins {
+    id 'fabric-loom' version '1.16-SNAPSHOT'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "https://maven.fabricmc.net/"
+    }
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        "solstice" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+
+    accessWidenerPath = file("src/main/resources/solstice.accesswidener")
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = project.java_version as Integer
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(project.java_version as Integer)
+    }
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName}" }
+    }
+    archiveFileName = "${project.archives_base_name}.jar"
+}
+
+remapJar {
+    archiveFileName = "${project.archives_base_name}.jar"
+}
+
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+    repositories {}
+}
