@@ -92,12 +92,9 @@ public class SolsticeScreen extends Screen {
     /**
      * Y of the delimiter line above the footer buttons - also the hard clip
      * boundary for the Quality of Life/Advanced module grid, which scrolls a
-     * whole row at a time (like {@code VisualsEditScreen}), except for one
-     * intentional partial row of overhang: when more content exists below the
-     * current scroll position, the next row still renders and is cropped to
-     * this line via scissor (see {@link #render}) instead of being fully
-     * hidden, so a sliver of the next row is always visible as a "there's
-     * more, scroll down" hint.
+     * whole row at a time (like {@code VisualsEditScreen}) rather than ever
+     * drawing a card below this line. See {@link #render}'s small chevron hint
+     * for how "there's more to scroll to" is signaled instead.
      */
     private int footerButtonY;
     private int moduleContentViewportTop;
@@ -231,13 +228,15 @@ public class SolsticeScreen extends Screen {
                 .filter(m -> matchesQuery(m, tabSearchField.getText()))
                 .collect(Collectors.toList());
 
-        // Scrolls a whole row at a time - moduleVisibleRows/moduleMaxScrollRow (the
-        // scroll bounds) are still based on whole rows, but rendering itself allows one
-        // extra row past that, cropped by the scissor box in render() at footerButtonY,
-        // whenever there's more content below. That sliver of a card peeking over the
-        // line is the signal that there's more to scroll to - fully hiding it (the old
-        // behavior) gave no such hint once a scroll position happened to end exactly on
-        // a row boundary.
+        // Scrolls a whole row at a time rather than ever drawing a card past
+        // footerButtonY (the delimiter line above Done/Edit HUD Layout) - the
+        // same no-scissor-needed technique VisualsEditScreen already uses,
+        // just applied to a multi-column grid instead of one row per widget.
+        // A scissor-cropped partial overhang row was tried here as a "more
+        // below" hint and reverted - it visually broke the category tabs at
+        // the top of the screen (rendered invisible while still clickable),
+        // for reasons not fully root-caused. See render()'s "more below"
+        // indicator instead for the same hint without touching scissor state.
         int rowStep = ModuleCardWidget.HEIGHT + CARD_GAP;
         int viewportH = Math.max(ModuleCardWidget.HEIGHT, footerButtonY - moduleContentTop - CARD_GAP);
         moduleVisibleRows = Math.max(1, (viewportH + CARD_GAP) / rowStep);
@@ -245,13 +244,11 @@ public class SolsticeScreen extends Screen {
         moduleMaxScrollRow = Math.max(0, totalRows - moduleVisibleRows);
         moduleScrollRow = Math.max(0, Math.min(moduleScrollRow, moduleMaxScrollRow));
 
-        int drawableRows = moduleScrollRow + moduleVisibleRows < totalRows ? moduleVisibleRows + 1 : moduleVisibleRows;
-
         for (int i = 0; i < modules.size(); i++) {
             int col = i % CARD_COLS;
             int row = i / CARD_COLS;
             int visualRow = row - moduleScrollRow;
-            if (visualRow < 0 || visualRow >= drawableRows) {
+            if (visualRow < 0 || visualRow >= moduleVisibleRows) {
                 continue;
             }
 
@@ -660,18 +657,21 @@ public class SolsticeScreen extends Screen {
         // backgrounds, reading as visual overlap). Buttons now just sit on the
         // screen's own full-bleed OVERLAY_DARK dim filled above.
 
-        // Only the module grid ever draws a card that pokes past footerButtonY (see
-        // rebuildCards()'s drawableRows) - scissoring exactly [moduleContentViewportTop,
-        // footerButtonY] crops just that overhanging sliver. Every other widget (tabs,
-        // search fields, Done/Edit HUD Layout) sits entirely outside this Y band, so it
-        // renders completely unaffected.
-        if (isModuleGridActive()) {
-            context.enableScissor(0, moduleContentViewportTop, width, footerButtonY);
-            super.render(context, mouseX, mouseY, delta);
-            context.disableScissor();
-        } else {
-            super.render(context, mouseX, mouseY, delta);
+        // "More below" hint - a small centered chevron just above the footer line
+        // when scrolling further would reveal more modules. Plain 2D draw, no
+        // scissor/matrix state involved (a scissor-cropped partial row was tried
+        // here before and reverted - it broke rendering of the category tabs).
+        if (isModuleGridActive() && moduleScrollRow < moduleMaxScrollRow) {
+            drawMoreBelowHint(context);
         }
+
+        super.render(context, mouseX, mouseY, delta);
+    }
+
+    private void drawMoreBelowHint(DrawContext context) {
+        String hint = "v";
+        int hintW = textRenderer.getWidth(hint);
+        context.drawText(textRenderer, hint, (width - hintW) / 2, footerButtonY - 11, ColorPalette.TEXT_SECONDARY, false);
     }
 
     @Override
