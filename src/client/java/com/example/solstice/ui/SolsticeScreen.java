@@ -90,17 +90,19 @@ public class SolsticeScreen extends Screen {
     private final List<ProfileRowLabel> profileRowLabels = new ArrayList<>();
 
     /**
-     * Y of the delimiter line above the footer buttons - also the hard clip
-     * boundary for the Quality of Life/Advanced module grid, which scrolls a
-     * whole row at a time (like {@code VisualsEditScreen}) rather than ever
-     * drawing a card below this line. See {@link #render}'s small chevron hint
-     * for how "there's more to scroll to" is signaled instead.
+     * Y of the delimiter line above the footer buttons - the module grid scrolls a
+     * whole row at a time (like {@code VisualsEditScreen}), but unlike that screen
+     * one extra "peek" row is still drawn past this line (visually cut off by the
+     * footer strip via {@link ModuleCardWidget#setClipBottomY}, not hidden outright)
+     * so it's visible there's more to scroll to.
      */
     private int footerButtonY;
     private int moduleContentViewportTop;
     private int moduleVisibleRows;
     private int moduleMaxScrollRow;
     private int moduleScrollRow;
+    /** {@link #moduleScrollRow} from just before the in-progress scroll step - see {@link #rebuildCards}'s animatable-card check. */
+    private int prevModuleScrollRow;
 
     /**
      * Each module card's fully-settled ("natural") Y, parallel to {@link #cards} whenever
@@ -110,9 +112,23 @@ public class SolsticeScreen extends Screen {
      * its new position in one frame, which read as an instant screen-switch rather than a
      * scroll. Offsetting the real widget Y (not a matrix translate) was chosen deliberately
      * over wrapping the render call in a transform/scissor - see the reverted attempt at
-     * exactly that for the "partial row" feature, which broke the category tabs outright.
+     * exactly that for the "partial row" feature, which broke the category tabs outright
+     * (the new per-widget scissor {@link ModuleCardWidget} uses for its own peek-row clip
+     * is scoped entirely inside that one widget's own render call instead, never wrapping
+     * a shared {@code super.render()}, specifically to avoid repeating that regression).
      */
     private final List<Integer> cardNaturalY = new ArrayList<>();
+    /**
+     * Parallel to {@link #cards}/{@link #cardNaturalY} - whether a card should receive
+     * the in-flight {@link #scrollAnimOffsetPx} at all. A card whose row was already
+     * visible (or was the peek row) before the current scroll step slides smoothly from
+     * its old position; a card newly revealed by this scroll step never existed on
+     * screen a moment ago, so animating it with the same offset made it flash in from
+     * an artificial position beyond the visible area (reported as "top cards appear too
+     * high for a second" when scrolling back up) - those instead render immediately at
+     * their natural resting position, no animation.
+     */
+    private final List<Boolean> cardAnimatable = new ArrayList<>();
     private float scrollAnimOffsetPx;
     private long lastScrollAnimNanos;
     private static final float SCROLL_ANIM_DECAY_PER_SECOND = 16f;
@@ -197,6 +213,8 @@ public class SolsticeScreen extends Screen {
     private void selectCategory(ModuleCategory cat) {
         activeCategory = cat;
         moduleScrollRow = 0;
+        prevModuleScrollRow = 0;
+        scrollAnimOffsetPx = 0f;
         texturesScrollOffset = 0;
         tabs.forEach(t -> t.setSelected(t.getCategory() == cat));
         rebuildCards();
@@ -208,6 +226,7 @@ public class SolsticeScreen extends Screen {
         cards.forEach(this::remove);
         cards.clear();
         cardNaturalY.clear();
+        cardAnimatable.clear();
         profileRowLabels.clear();
 
         int contentTop = HEADER_H + TAB_H + CARD_GAP;
@@ -244,15 +263,15 @@ public class SolsticeScreen extends Screen {
                 .filter(m -> matchesQuery(m, tabSearchField.getText()))
                 .collect(Collectors.toList());
 
-        // Scrolls a whole row at a time rather than ever drawing a card past
-        // footerButtonY (the delimiter line above Done/Edit HUD Layout) - the
-        // same no-scissor-needed technique VisualsEditScreen already uses,
-        // just applied to a multi-column grid instead of one row per widget.
-        // A scissor-cropped partial overhang row was tried here as a "more
-        // below" hint and reverted - it visually broke the category tabs at
-        // the top of the screen (rendered invisible while still clickable),
-        // for reasons not fully root-caused. See render()'s "more below"
-        // indicator instead for the same hint without touching scissor state.
+        // Scrolls a whole row at a time - the same no-scissor-around-the-whole-
+        // grid technique VisualsEditScreen already uses - but one extra "peek"
+        // row past footerButtonY is still built (visualRow == moduleVisibleRows)
+        // so there's always a visible, half-cut hint of more content below,
+        // rather than a fully separate chevron glyph. That peek row's own cards
+        // clip themselves via ModuleCardWidget.setClipBottomY, scoped to just
+        // that one widget's render call - see its Javadoc for why this avoids
+        // the category-tab regression the earlier whole-screen-scissor attempt
+        // caused.
         int rowStep = ModuleCardWidget.HEIGHT + CARD_GAP;
         int viewportH = Math.max(ModuleCardWidget.HEIGHT, footerButtonY - moduleContentTop - CARD_GAP);
         moduleVisibleRows = Math.max(1, (viewportH + CARD_GAP) / rowStep);
@@ -260,11 +279,20 @@ public class SolsticeScreen extends Screen {
         moduleMaxScrollRow = Math.max(0, totalRows - moduleVisibleRows);
         moduleScrollRow = Math.max(0, Math.min(moduleScrollRow, moduleMaxScrollRow));
 
+        // A row is "animatable" (slides from its old on-screen position) only if
+        // it was already part of the visible window (including the peek row)
+        // before this particular scroll step - a row newly revealed by this
+        // scroll didn't exist on screen a moment ago, so it renders immediately
+        // at its resting position instead of flashing in from an offset that
+        // never corresponded to a real previous position.
+        int prevWindowLo = prevModuleScrollRow;
+        int prevWindowHi = prevModuleScrollRow + moduleVisibleRows;
+
         for (int i = 0; i < modules.size(); i++) {
             int col = i % CARD_COLS;
             int row = i / CARD_COLS;
             int visualRow = row - moduleScrollRow;
-            if (visualRow < 0 || visualRow >= moduleVisibleRows) {
+            if (visualRow < 0 || visualRow > moduleVisibleRows) {
                 continue;
             }
 
@@ -277,8 +305,13 @@ public class SolsticeScreen extends Screen {
                         assert client != null;
                         client.setScreen(new ModuleDetailScreen(this, m));
                     });
+            if (visualRow == moduleVisibleRows) {
+                // The peek row - drawn past footerButtonY, cut off there.
+                card.setClipBottomY(footerButtonY);
+            }
             cards.add(card);
             cardNaturalY.add(cy);
+            cardAnimatable.add(row >= prevWindowLo && row <= prevWindowHi);
             addDrawableChild(card);
         }
     }
@@ -602,6 +635,7 @@ public class SolsticeScreen extends Screen {
             if (newScrollRow != moduleScrollRow) {
                 int rowStep = ModuleCardWidget.HEIGHT + CARD_GAP;
                 scrollAnimOffsetPx += (newScrollRow - moduleScrollRow) * rowStep;
+                prevModuleScrollRow = moduleScrollRow;
                 moduleScrollRow = newScrollRow;
                 rebuildCards();
             }
@@ -676,22 +710,12 @@ public class SolsticeScreen extends Screen {
         // backgrounds, reading as visual overlap). Buttons now just sit on the
         // screen's own full-bleed OVERLAY_DARK dim filled above.
 
-        // "More below" hint - a small centered chevron just above the footer line
-        // when scrolling further would reveal more modules. Plain 2D draw, no
-        // scissor/matrix state involved (a scissor-cropped partial row was tried
-        // here before and reverted - it broke rendering of the category tabs).
-        if (isModuleGridActive() && moduleScrollRow < moduleMaxScrollRow) {
-            drawMoreBelowHint(context);
-        }
+        // "More below" is now signaled by the peek row itself (see rebuildCards) -
+        // a real, half-cut card row overhanging past the footer line - rather than
+        // a separate chevron glyph.
 
         applyScrollAnimation();
         super.render(context, mouseX, mouseY, delta);
-    }
-
-    private void drawMoreBelowHint(DrawContext context) {
-        String hint = "v";
-        int hintW = textRenderer.getWidth(hint);
-        context.drawText(textRenderer, hint, (width - hintW) / 2, footerButtonY - 11, ColorPalette.TEXT_SECONDARY, false);
     }
 
     /**
@@ -714,7 +738,8 @@ public class SolsticeScreen extends Screen {
 
         int offset = Math.round(scrollAnimOffsetPx);
         for (int i = 0; i < cards.size() && i < cardNaturalY.size(); i++) {
-            cards.get(i).setY(cardNaturalY.get(i) + offset);
+            boolean animatable = i < cardAnimatable.size() && cardAnimatable.get(i);
+            cards.get(i).setY(cardNaturalY.get(i) + (animatable ? offset : 0));
         }
     }
 

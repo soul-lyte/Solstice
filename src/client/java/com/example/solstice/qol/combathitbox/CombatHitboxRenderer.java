@@ -23,15 +23,15 @@ import java.util.List;
  * real collision/reach/attack logic - the outline width setting only scales
  * the drawn line, not the entity's actual hitbox.
  *
- * <p>Turns red for whichever entity is currently the crosshair target
- * (vanilla's own reach-limited raycast, {@code client.crosshairTarget}) -
- * fixed, not a configurable color, matching the reference mod's own
- * always-on target highlight.</p>
+ * <p>Turns {@link CombatHitboxModule#outlineColor} for whichever entity is
+ * currently the crosshair target (vanilla's own reach-limited raycast,
+ * {@code client.crosshairTarget}) - every other nearby entity gets a fixed,
+ * non-configurable neutral white outline instead.</p>
  */
 public final class CombatHitboxRenderer {
 
     private static final double RANGE = 32.0;
-    private static final int IN_RANGE_COLOR = 0xFFFF0000;
+    private static final int DEFAULT_COLOR = 0xFFFFFFFF;
 
     private CombatHitboxRenderer() {}
 
@@ -53,12 +53,13 @@ public final class CombatHitboxRenderer {
         Entity targeted = client.crosshairTarget instanceof EntityHitResult ehr ? ehr.getEntity() : null;
         float tickDelta = client.getRenderTickCounter().getTickProgress(true);
 
+        boolean playersOnly = CombatHitboxModule.playersOnly;
         Box searchBox = player.getBoundingBox().expand(RANGE);
         List<Entity> nearby = client.world.getOtherEntities(player, searchBox,
-                e -> e instanceof LivingEntity && e.isAlive());
+                e -> e.isAlive() && (playersOnly ? e instanceof PlayerEntity : e instanceof LivingEntity));
 
-        DrawStyle outlineStyle = DrawStyle.stroked(CombatHitboxModule.outlineColor, CombatHitboxModule.outlineWidth);
-        DrawStyle targetStyle = DrawStyle.stroked(IN_RANGE_COLOR, CombatHitboxModule.outlineWidth);
+        DrawStyle outlineStyle = DrawStyle.stroked(DEFAULT_COLOR, CombatHitboxModule.outlineWidth);
+        DrawStyle targetStyle = DrawStyle.stroked(CombatHitboxModule.outlineColor, CombatHitboxModule.outlineWidth);
 
         for (Entity entity : nearby) {
             GizmoDrawing.box(lerpedBox(entity, tickDelta), entity == targeted ? targetStyle : outlineStyle);

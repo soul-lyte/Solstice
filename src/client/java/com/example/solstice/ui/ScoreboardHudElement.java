@@ -47,7 +47,12 @@ public final class ScoreboardHudElement implements HudElement {
 
     @Override
     public int getDefaultY(int screenWidth, int screenHeight) {
-        return screenHeight / 4;
+        // Vanilla anchors the panel's bottom edge to screenHeight/2 + rowCount*3, growing upward
+        // by rowCount*9 for the entry rows plus a 10px header - confirmed via decompiling
+        // InGameHud.renderScoreboardSidebar - so the real top-of-header y is
+        // screenHeight/2 - rowCount*6. Matches the example content's own row count so this
+        // preview box lines up with what render() actually draws.
+        return screenHeight / 2 - EXAMPLE_NAMES.length * 6;
     }
 
     @Override

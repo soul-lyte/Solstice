@@ -7,11 +7,13 @@ import com.example.solstice.ui.theme.ColorPalette;
 import com.example.solstice.ui.theme.SolsticeTheme;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.function.Consumer;
@@ -30,10 +32,15 @@ import java.util.function.Consumer;
  * </pre>
  *
  * <p>Left-click toggles the module (or opens settings for always-on
- * placeholder modules, which have nothing to toggle). Right-click always
- * opens the module's dedicated settings screen. The bottom edit bar spans
- * the full card width (not just a small corner button) for modules
- * implementing {@link EditableModule}.</p>
+ * placeholder modules, which have nothing to toggle). Right-click opens the
+ * module's dedicated settings screen - or, for a module implementing
+ * {@link EditableModule}, jumps straight to its edit screen instead, same as
+ * clicking the bottom edit bar would. The bottom edit bar spans the full card
+ * width (not just a small corner button) for modules implementing
+ * {@link EditableModule}; a small gear icon in the bottom-right corner marks
+ * any other card with a real (non-empty) settings list - left-clicking that
+ * icon specifically opens settings directly, without toggling the module
+ * underneath it.</p>
  */
 public class ModuleCardWidget extends SolsticeClickableWidget {
 
@@ -41,10 +48,26 @@ public class ModuleCardWidget extends SolsticeClickableWidget {
     private static final int EDIT_BAR_H = 14;
     private static final int PADDING = 8;
     private static final int TOGGLE_W = 26;
+    private static final int GEAR_SIZE = 10;
+    private static final int GEAR_TEX_SIZE = 32;
+    private static final Identifier GEAR_ICON = Identifier.of("solstice", "textures/gui/icons/settings_gear.png");
 
     private final Module module;
     private final TextRenderer textRenderer;
     private final Consumer<Module> onOpenSettings;
+
+    /**
+     * When set, this card is the partial "peek" row overhanging past the
+     * module grid's footer line ({@code SolsticeScreen.footerButtonY}) - drawn
+     * fully but visually cut off at this Y via a scissor scoped entirely to
+     * this one widget's own {@link #renderWidget} call (opened and closed
+     * within the same method, never wrapping a shared {@code super.render()}
+     * call the way the earlier, reverted attempt at this did - see
+     * {@code SolsticeScreen}'s own history note on why that broke the
+     * category tabs). Hit-testing is clipped the same way, so the hidden
+     * portion isn't clickable either.
+     */
+    private Integer clipBottomY;
 
     public ModuleCardWidget(int x, int y, int width, Module module, TextRenderer textRenderer,
                              Consumer<Module> onOpenSettings) {
@@ -55,8 +78,39 @@ public class ModuleCardWidget extends SolsticeClickableWidget {
         setTooltip(Tooltip.of(Text.of(module.getDescription() + " (right-click for settings)")));
     }
 
+    /** See {@link #clipBottomY}. Pass {@code null} to render/click normally, uncut. */
+    public void setClipBottomY(Integer y) {
+        this.clipBottomY = y;
+    }
+
+    private boolean isClippedAt(int y) {
+        return clipBottomY != null && y >= clipBottomY;
+    }
+
+    @Override
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        if (clipBottomY != null && mouseY >= clipBottomY) {
+            return false;
+        }
+        return super.isMouseOver(mouseX, mouseY);
+    }
+
     @Override
     protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+        boolean scissoring = clipBottomY != null && clipBottomY < getY() + HEIGHT;
+        if (scissoring) {
+            context.enableScissor(getX(), getY(), getX() + getWidth(), clipBottomY);
+        }
+        try {
+            renderContent(context, mouseX, mouseY);
+        } finally {
+            if (scissoring) {
+                context.disableScissor();
+            }
+        }
+    }
+
+    private void renderContent(DrawContext context, int mouseX, int mouseY) {
         boolean hovered = isHovered();
 
         SolsticeTheme.drawCard(context, getX(), getY(), getWidth(), HEIGHT, hovered);
@@ -98,11 +152,22 @@ public class ModuleCardWidget extends SolsticeClickableWidget {
             int tw = textRenderer.getWidth(label);
             context.drawText(textRenderer, label, r[0] + (r[2] - tw) / 2, r[1] + (r[3] - 8) / 2,
                     ColorPalette.TEXT_SECONDARY, false);
+        } else if (!module.getSettings().isEmpty()) {
+            // Small gear icon, bottom-right - both a visual hint that this card
+            // has a real settings list, and directly clickable (left-click) to
+            // open it without toggling the module underneath it.
+            int[] r = gearIconRect();
+            context.drawTexture(RenderPipelines.GUI_TEXTURED, GEAR_ICON, r[0], r[1], 0f, 0f,
+                    r[2], r[3], GEAR_TEX_SIZE, GEAR_TEX_SIZE);
         }
     }
 
     private int[] editButtonRect() {
         return new int[]{getX(), getY() + HEIGHT - EDIT_BAR_H, getWidth(), EDIT_BAR_H};
+    }
+
+    private int[] gearIconRect() {
+        return new int[]{getX() + getWidth() - PADDING - GEAR_SIZE, getY() + HEIGHT - PADDING - GEAR_SIZE, GEAR_SIZE, GEAR_SIZE};
     }
 
     @Override
@@ -111,15 +176,26 @@ public class ModuleCardWidget extends SolsticeClickableWidget {
         int my = (int) click.y();
         if (module instanceof EditableModule editable) {
             int[] r = editButtonRect();
-            if (mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3]) {
+            if (mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3] && !isClippedAt(my)) {
                 SolsticeSounds.playClick();
                 MinecraftClient.getInstance().setScreen(editable.createEditScreen(MinecraftClient.getInstance().currentScreen));
+                return true;
+            }
+        } else if (!module.getSettings().isEmpty() && click.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            int[] r = gearIconRect();
+            if (mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3] && !isClippedAt(my)) {
+                SolsticeSounds.playClick();
+                onOpenSettings.accept(module);
                 return true;
             }
         }
         if (isHovered() && click.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
             SolsticeSounds.playClick();
-            onOpenSettings.accept(module);
+            if (module instanceof EditableModule editable) {
+                MinecraftClient.getInstance().setScreen(editable.createEditScreen(MinecraftClient.getInstance().currentScreen));
+            } else {
+                onOpenSettings.accept(module);
+            }
             return true;
         }
         if (module.isAlwaysOn()) {

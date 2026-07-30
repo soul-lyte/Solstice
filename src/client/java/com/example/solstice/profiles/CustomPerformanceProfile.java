@@ -6,7 +6,6 @@ import com.example.solstice.performance.network.NetworkModule;
 import com.example.solstice.performance.render.EntityCullingModule;
 import com.example.solstice.performance.render.ParticleLimiterModule;
 import com.example.solstice.performance.render.RenderModule;
-import com.example.solstice.viewdistance.ViewDistanceModule;
 
 /**
  * One user-saveable "Custom" slot for the Performance profile row. Captures
@@ -29,8 +28,6 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
     private boolean rdEnabled;
     private int rdFpsThreshold;
     private int rdGraceFrames;
-    private int extraChunks;
-    private boolean vdEnabled;
     private double gcThreshold;
     private long gcIntervalMs;
     private int maxParticles;
@@ -57,8 +54,6 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         rdEnabled = cfg.getBoolean(key("rd_enabled"), RenderModule.dynamicRenderDistanceEnabled);
         rdFpsThreshold = cfg.getInt(key("rd_fps_threshold"), RenderModule.dynamicRenderDistanceFpsThreshold);
         rdGraceFrames = cfg.getInt(key("rd_grace_frames"), RenderModule.dynamicRenderDistanceGraceFrames);
-        extraChunks = cfg.getInt(key("extra_chunks"), ViewDistanceModule.extraChunks);
-        vdEnabled = cfg.getBoolean(key("vd_enabled"), ViewDistanceModule.getInstance().isEnabled());
         gcThreshold = cfg.getDouble(key("gc_threshold"), MemoryModule.gcHintThreshold);
         gcIntervalMs = cfg.getInt(key("gc_interval_ms"), (int) MemoryModule.gcHintIntervalMs);
         maxParticles = cfg.getInt(key("max_particles"), ParticleLimiterModule.maxParticles);
@@ -77,8 +72,6 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         rdEnabled = RenderModule.dynamicRenderDistanceEnabled;
         rdFpsThreshold = RenderModule.dynamicRenderDistanceFpsThreshold;
         rdGraceFrames = RenderModule.dynamicRenderDistanceGraceFrames;
-        extraChunks = ViewDistanceModule.extraChunks;
-        vdEnabled = ViewDistanceModule.getInstance().isEnabled();
         gcThreshold = MemoryModule.gcHintThreshold;
         gcIntervalMs = MemoryModule.gcHintIntervalMs;
         maxParticles = ParticleLimiterModule.maxParticles;
@@ -94,8 +87,6 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         cfg.set(key("rd_enabled"), rdEnabled);
         cfg.set(key("rd_fps_threshold"), rdFpsThreshold);
         cfg.set(key("rd_grace_frames"), rdGraceFrames);
-        cfg.set(key("extra_chunks"), extraChunks);
-        cfg.set(key("vd_enabled"), vdEnabled);
         cfg.set(key("gc_threshold"), gcThreshold);
         cfg.set(key("gc_interval_ms"), (int) gcIntervalMs);
         cfg.set(key("max_particles"), maxParticles);
@@ -130,9 +121,6 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         cfg.set("render.dynamic_rd_fps_threshold", rdFpsThreshold);
         cfg.set("render.dynamic_rd_grace_frames", rdGraceFrames);
 
-        ViewDistanceModule.getInstance().setExtraChunks(extraChunks);
-        ViewDistanceModule.getInstance().setEnabled(vdEnabled);
-
         MemoryModule.gcHintThreshold = gcThreshold;
         MemoryModule.gcHintIntervalMs = gcIntervalMs;
         cfg.set("memory.gc_threshold", gcThreshold);
@@ -162,8 +150,6 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
                 && RenderModule.dynamicRenderDistanceEnabled == rdEnabled
                 && RenderModule.dynamicRenderDistanceFpsThreshold == rdFpsThreshold
                 && RenderModule.dynamicRenderDistanceGraceFrames == rdGraceFrames
-                && ViewDistanceModule.extraChunks == extraChunks
-                && ViewDistanceModule.getInstance().isEnabled() == vdEnabled
                 && MemoryModule.gcHintThreshold == gcThreshold
                 && MemoryModule.gcHintIntervalMs == gcIntervalMs
                 && ParticleLimiterModule.maxParticles == maxParticles

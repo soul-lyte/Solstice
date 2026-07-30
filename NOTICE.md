@@ -12,6 +12,16 @@ Adapted directly from source code, not just inspired by:
 - **Lithium** (CaffeineMC) - https://github.com/CaffeineMC/lithium - LGPL-3.0-only
 - **ImmediatelyFast** (RaphiMC) - https://github.com/RaphiMC/ImmediatelyFast - LGPL-3.0-only
 - **Locator Heads** (Haage001) - https://github.com/Haage001/locator-heads - LGPL-3.0-only
+- **Bobby** (Johni0702) - https://github.com/Johni0702/bobby - LGPL-3.0-only.
+  The entire "Chunk Retention" feature (`com.example.solstice.viewdistance`,
+  `com.example.solstice.mixin.viewdistance`) is a port of Bobby's real
+  architecture (tag `v5.2.11.1+mc1.21.11`) onto this project's own naming
+  conventions: `FakeChunk`, `FakeChunkManager`, `FakeChunkStorage`,
+  `ChunkSerializer`, `VisibleChunksTracker`, `FileSystemUtils`, and the
+  `LightingProviderMixin`/`ChunkLightProviderMixin` shadow light-data system.
+  Scoped down from upstream Bobby: no dynamic multi-world merge/fingerprinting
+  (`Worlds`), no `/bobby` commands, no `LastAccessFile`-based automatic
+  region cleanup, and no Sodium/Starlight compatibility shims.
 
 Full license text: `licenses/LICENSE-LGPL-3.0.txt`.
 

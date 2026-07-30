@@ -4,42 +4,61 @@ import com.example.solstice.core.config.ConfigManager;
 import com.example.solstice.core.module.AbstractModule;
 import com.example.solstice.core.module.ModuleCategory;
 import com.example.solstice.core.module.ModuleSetting;
-import net.minecraft.client.MinecraftClient;
 
 import java.util.List;
 
 /**
- * ViewDistanceModule - keeps already-explored chunks visible a bit past what
- * the server actually sends, similar to Voxy: no new data, no entities, no
- * disk persistence, just the last-known terrain staying on screen instead of
- * popping out immediately. See {@code FakeChunkManager}/{@code
- * ClientChunkManagerMixin} for the actual mechanism.
+ * ViewDistanceModule - rebuilt on Johni0702/bobby's real architecture
+ * (LGPL-3.0-only, see NOTICE.md), replacing this project's own earlier
+ * from-scratch retention attempt entirely. Chunks the player has already
+ * explored are cached (in memory, and on disk under {@code
+ * .solstice-chunkcache/} in the run directory) and redrawn as "fake" chunks
+ * when they fall outside the server's real view distance, instead of
+ * popping out the instant they unload.
  *
- * <p>How far to extend ("Extra Chunks") is configured from the new Solstice
- * Video Settings screen, alongside vanilla's own render distance, not from
- * here - this module is just the on/off switch.</p>
+ * <p>Unlike the old implementation, there is no separate "Extra Chunks"
+ * number. {@link com.example.solstice.mixin.viewdistance.GameOptionsMixin}
+ * makes {@code GameOptions.getClampedViewDistance()} return the client's own
+ * raw render-distance option instead of clamping it to the server's real
+ * radius - so raising the existing (already-uncapped) Render Distance
+ * slider in Video Settings directly controls how far retained chunks
+ * extend, with fog/far-plane/render-storage sizing all automatically
+ * agreeing since they all read from that same one method.</p>
  *
- * <p>Off by default given the real risk profile of directly touching chunk
- * loading - this is the newest, least-precedented part of Solstice.</p>
+ * <p>In singleplayer, {@link
+ * com.example.solstice.mixin.viewdistance.IntegratedServerMixin} keeps the
+ * embedded server's own real chunk-sending radius fixed at {@link
+ * #serverViewDistanceOverwrite} regardless of how high the client's render
+ * distance is raised - otherwise the server would just send real data out to
+ * the same inflated distance, leaving nothing for retention to fill in.</p>
+ *
+ * <p><b>Known limitation, same as upstream Bobby</b>: the retention system
+ * only attaches itself when a world's {@code ClientChunkManager} is first
+ * constructed (world join). Toggling this module while already in a world
+ * takes effect on the next rejoin, not immediately.</p>
  */
 public final class ViewDistanceModule extends AbstractModule {
 
     private static final ViewDistanceModule INSTANCE = new ViewDistanceModule();
 
-    /** How many chunks beyond what the server sends to keep visible. Set from the Video Settings screen. */
-    public static int extraChunks = 4;
+    /** Fixed real chunk-sending radius for the singleplayer integrated server. 0 = no override. */
+    public static int serverViewDistanceOverwrite = 8;
+
+    private int unloadDelaySecs = 30;
+    private boolean taintFakeChunks = false;
+    private boolean skipBlockEntities = true;
 
     private ViewDistanceModule() {}
 
     public static ViewDistanceModule getInstance() { return INSTANCE; }
 
     @Override public String getId()          { return "view_distance"; }
-    @Override public String getDisplayName() { return "Extended View Distance"; }
-    @Override public String getDescription() { return "Keeps already-explored chunks visible a bit past what the server sends, instead of them popping out immediately."; }
+    @Override public String getDisplayName() { return "Chunk Retention"; }
+    @Override public String getDescription() { return "Keeps terrain you've already visited on screen instead of it popping out immediately. How far it extends is controlled by the Render Distance slider in Video Settings, not a separate setting here."; }
 
     @Override
-    public java.util.List<String> getSearchKeywords() {
-        return java.util.List.of("voxy", "bobby", "distant horizons", "extra chunks", "chunk retention", "fake chunks");
+    public List<String> getSearchKeywords() {
+        return List.of("voxy", "bobby", "distant horizons", "chunk retention", "fake chunks", "chunk cache");
     }
     @Override public ModuleCategory getCategory() { return ModuleCategory.ADVANCED; }
     @Override protected boolean defaultEnabled() { return false; }
@@ -48,46 +67,61 @@ public final class ViewDistanceModule extends AbstractModule {
     public List<ModuleSetting> getSettings() {
         return List.of(
                 new ModuleSetting.IntSetting(
-                        "Extra Chunks",
-                        "How many extra chunks beyond your render distance to keep visible once already explored, instead of them popping out immediately. Also editable from the Video Settings screen.",
-                        0, 16,
-                        () -> extraChunks,
-                        this::setExtraChunks)
+                        "Unload Delay (seconds)",
+                        "How long a chunk stays cached in memory after moving out of range before it's dropped (still recoverable from disk afterwards). Higher values smooth out back-and-forth movement at the edge of your view distance.",
+                        0, 300,
+                        () -> unloadDelaySecs,
+                        this::setUnloadDelaySecs),
+                new ModuleSetting.BooleanSetting(
+                        "Skip Block Entities",
+                        "Don't load chests/signs/etc. inside cached chunks. Faster and lighter on memory - the block geometry itself is unaffected.",
+                        () -> skipBlockEntities,
+                        this::setSkipBlockEntities),
+                new ModuleSetting.BooleanSetting(
+                        "Taint Fake Chunks",
+                        "Debug aid: dims the lighting on cached chunks so you can visually tell them apart from real terrain.",
+                        () -> taintFakeChunks,
+                        this::setTaintFakeChunks),
+                new ModuleSetting.IntSetting(
+                        "Singleplayer Real Chunk Radius",
+                        "How far ahead of you, into terrain you haven't visited yet, the singleplayer world actually generates and sends real data - independent of your (uncapped) Render Distance slider. Raising this closes the gap between unexplored terrain ahead of you and already-explored terrain behind you (which can always extend to the full Render Distance for free from cache), at the cost of real chunk generation load. Setting it equal to Render Distance removes the gap entirely.",
+                        2, 64,
+                        () -> serverViewDistanceOverwrite,
+                        this::setServerViewDistanceOverwrite)
         );
     }
 
     @Override
     protected void init() {
-        extraChunks = ConfigManager.getInstance().getInt("view_distance.extra_chunks", 4);
+        unloadDelaySecs = ConfigManager.getInstance().getInt("view_distance.unload_delay_secs", 30);
+        skipBlockEntities = ConfigManager.getInstance().getBoolean("view_distance.skip_block_entities", true);
+        taintFakeChunks = ConfigManager.getInstance().getBoolean("view_distance.taint_fake_chunks", false);
+        serverViewDistanceOverwrite = ConfigManager.getInstance().getInt("view_distance.server_view_distance", 8);
     }
 
-    /** 0 turns the module off; 1+ turns it on - the slider doubles as the on/off switch. */
-    public void setExtraChunks(int value) {
-        extraChunks = value;
-        ConfigManager.getInstance().set("view_distance.extra_chunks", value);
-        setEnabled(value > 0);
-        reloadRenderStorage();
+    public int getUnloadDelaySecs() { return unloadDelaySecs; }
+
+    public void setUnloadDelaySecs(int value) {
+        unloadDelaySecs = value;
+        ConfigManager.getInstance().set("view_distance.unload_delay_secs", value);
     }
 
-    @Override
-    public void onEnable() { reloadRenderStorage(); }
+    public boolean isSkipBlockEntities() { return skipBlockEntities; }
 
-    @Override
-    public void onDisable() { reloadRenderStorage(); }
+    public void setSkipBlockEntities(boolean value) {
+        skipBlockEntities = value;
+        ConfigManager.getInstance().set("view_distance.skip_block_entities", value);
+    }
 
-    /**
-     * {@code BuiltChunkStorageMixin} only re-reads {@code extraChunks} the next time
-     * {@code BuiltChunkStorage} is (re)constructed, which only happens from
-     * {@code WorldRenderer.reload()} - normally triggered by vanilla's own render
-     * distance slider, world join, etc. Without an explicit call here, toggling this
-     * module or dragging "Extra Chunks" wouldn't resize the render storage until the
-     * next unrelated reload (or a world rejoin), even though the setting itself
-     * already took effect - so trigger it directly, same as vanilla's own slider does.
-     */
-    private void reloadRenderStorage() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world != null) {
-            client.worldRenderer.reload();
-        }
+    public boolean isTaintFakeChunks() { return taintFakeChunks; }
+
+    public void setTaintFakeChunks(boolean value) {
+        taintFakeChunks = value;
+        ConfigManager.getInstance().set("view_distance.taint_fake_chunks", value);
+    }
+
+    public void setServerViewDistanceOverwrite(int value) {
+        serverViewDistanceOverwrite = value;
+        ConfigManager.getInstance().set("view_distance.server_view_distance", value);
     }
 }

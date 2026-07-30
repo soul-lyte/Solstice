@@ -6,7 +6,6 @@ import com.example.solstice.ui.widget.SolsticeButton;
 import com.example.solstice.ui.widget.SolsticeChoiceRow;
 import com.example.solstice.ui.widget.SolsticeSliderWidget;
 import com.example.solstice.ui.widget.SolsticeToggleRow;
-import com.example.solstice.viewdistance.ViewDistanceModule;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.CloudRenderMode;
 import net.minecraft.client.option.GameOptions;
@@ -96,8 +95,7 @@ public class SolsticeVideoSettingsScreen extends Screen {
         int y = HEADER_H + TAB_H + ROW_GAP;
 
         if (activeTab == 0) {
-            y = addIntRow(options.getViewDistance(), "Render Distance", "How many chunks of terrain load around you. Higher looks further but costs more FPS.", 2, 32, SIDE_PAD, y, contentW);
-            y = addIntRow(ViewDistanceModule.extraChunks, "Extra Chunks (Solstice)", "How many extra chunks beyond your render distance Solstice keeps visible once already explored, instead of them popping out immediately.", 0, 16, SIDE_PAD, y, contentW, ViewDistanceModule.getInstance()::setExtraChunks);
+            y = addIntRow(options.getViewDistance(), "Render Distance", "How many chunks of terrain load around you. Higher looks further but costs more FPS. With Chunk Retention (Solstice, Advanced tab) enabled, raising this also controls how far already-explored terrain stays visible.", 2, 64, SIDE_PAD, y, contentW);
             y = addIntRow(options.getSimulationDistance(), "Simulation Distance", "How far from you the game actually simulates things like crops growing or redstone - always at least as small as render distance.", 5, 32, SIDE_PAD, y, contentW);
             y = addDoubleRow(options.getEntityDistanceScaling(), "Entity Distance", "How far away entities (mobs, players, item drops) stay visible, as a percentage.", 0.5, 5.0, SIDE_PAD, y, contentW);
             y = addMaxFpsRow(options.getMaxFps(), SIDE_PAD, y, contentW);

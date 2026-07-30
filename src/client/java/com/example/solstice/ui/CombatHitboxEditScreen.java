@@ -6,6 +6,7 @@ import com.example.solstice.ui.theme.SolsticeTheme;
 import com.example.solstice.ui.widget.SolsticeButton;
 import com.example.solstice.ui.widget.SolsticeColorPickerWidget;
 import com.example.solstice.ui.widget.SolsticeSliderWidget;
+import com.example.solstice.ui.widget.SolsticeToggleRow;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -13,9 +14,9 @@ import net.minecraft.text.Text;
 /**
  * Outline width/color for the standalone Combat Hitbox module card, opened
  * via its "Edit" button ({@link EditableModule}) - includes a live 2D
- * preview of both the default outline and the fixed red "in range"
- * (crosshair target) outline, so the width/color combo is visible without
- * needing to actually be in combat to check it.
+ * preview of both the fixed white default outline and the configurable
+ * "target" outline, so the width/color combo is visible without needing to
+ * actually be in combat to check it.
  */
 public class CombatHitboxEditScreen extends Screen {
 
@@ -27,7 +28,7 @@ public class CombatHitboxEditScreen extends Screen {
     private static final int PREVIEW_H = 50;
     private static final int PREVIEW_BOX_W = 90;
     private static final int PREVIEW_BOX_H = 34;
-    private static final int IN_RANGE_COLOR = 0xFFFF0000;
+    private static final int DEFAULT_COLOR = 0xFFFFFFFF;
 
     private final Screen parent;
     private int panelX, panelY, panelH;
@@ -41,12 +42,16 @@ public class CombatHitboxEditScreen extends Screen {
     @Override
     protected void init() {
         int innerW = PANEL_W - PADDING * 2;
-        panelH = 30 + (ROW_H + ROW_GAP) + (COLOR_ROW_H + ROW_GAP) + PREVIEW_H + 30;
+        panelH = 30 + (ROW_H + ROW_GAP) * 2 + (COLOR_ROW_H + ROW_GAP) + PREVIEW_H + 30;
         panelX = (width - PANEL_W) / 2;
         panelY = Math.max(20, (height - panelH) / 2);
 
         int x = panelX + PADDING;
         int y = panelY + 26;
+
+        addDrawableChild(new SolsticeToggleRow(x, y, innerW, ROW_H, textRenderer, "Players Only",
+                () -> CombatHitboxModule.playersOnly, CombatHitboxModule::setPlayersOnly));
+        y += ROW_H + ROW_GAP;
 
         addDrawableChild(new SolsticeSliderWidget(x, y, innerW, ROW_H, textRenderer, "Outline Width",
                 0.5, 5.0, CombatHitboxModule.outlineWidth,
@@ -54,7 +59,7 @@ public class CombatHitboxEditScreen extends Screen {
                 v -> CombatHitboxModule.setOutlineWidth((float) (double) v)));
         y += ROW_H + ROW_GAP;
 
-        addDrawableChild(new SolsticeColorPickerWidget(x, y, innerW, COLOR_ROW_H, textRenderer, "Outline Color",
+        addDrawableChild(new SolsticeColorPickerWidget(x, y, innerW, COLOR_ROW_H, textRenderer, "Target Color",
                 () -> CombatHitboxModule.outlineColor & 0xFFFFFF,
                 rgb -> CombatHitboxModule.setOutlineColor(0xFF000000 | (rgb & 0xFFFFFF))));
         y += COLOR_ROW_H + ROW_GAP;
@@ -74,8 +79,8 @@ public class CombatHitboxEditScreen extends Screen {
         int gap = 16;
         int totalW = PREVIEW_BOX_W * 2 + gap;
         int startX = panelX + (PANEL_W - totalW) / 2;
-        drawPreviewBox(context, startX, previewY, "Default", CombatHitboxModule.outlineColor);
-        drawPreviewBox(context, startX + PREVIEW_BOX_W + gap, previewY, "In Range", IN_RANGE_COLOR);
+        drawPreviewBox(context, startX, previewY, "Default", DEFAULT_COLOR);
+        drawPreviewBox(context, startX + PREVIEW_BOX_W + gap, previewY, "Target", CombatHitboxModule.outlineColor);
 
         super.render(context, mouseX, mouseY, delta);
     }

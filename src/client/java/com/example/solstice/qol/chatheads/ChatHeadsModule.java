@@ -4,7 +4,6 @@ import com.example.solstice.core.config.ConfigManager;
 import com.example.solstice.core.module.AbstractModule;
 import com.example.solstice.core.module.ModuleCategory;
 import com.example.solstice.core.module.ModuleSetting;
-import com.example.solstice.mixin.chat.ChatSenderCarrier;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
