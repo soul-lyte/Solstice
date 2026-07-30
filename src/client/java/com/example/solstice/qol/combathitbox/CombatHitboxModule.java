@@ -38,6 +38,9 @@ public final class CombatHitboxModule extends AbstractModule implements Editable
 
     @Override protected boolean defaultEnabled() { return false; }
 
+    /** Not default anywhere, including PVP - an opt-in overlay, not something the PVP profile should force on. */
+    @Override public boolean excludeFromPvpProfile() { return true; }
+
     @Override
     public Screen createEditScreen(Screen parent) {
         return new CombatHitboxEditScreen(parent);

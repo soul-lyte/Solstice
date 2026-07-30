@@ -51,7 +51,14 @@ public final class InventoryHudElement implements HudElement {
     @Override public String getDisplayName() { return "Inventory HUD"; }
     @Override public int getWidth()          { return COLS * SLOT_SIZE; }
     @Override public int getHeight()         { return STORAGE_ROWS * SLOT_SIZE + HOTBAR_GAP + SLOT_SIZE; }
-    @Override public boolean isVisibleByDefault() { return false; }
+
+    /**
+     * True, unlike most off-by-default elements - {@link InventoryHudModule}'s own
+     * enable state is already the real on/off switch for this feature, so a second,
+     * independent "Visible" toggle in the HUD editor would just be a hidden extra
+     * step between enabling the module and actually seeing anything.
+     */
+    @Override public boolean isVisibleByDefault() { return true; }
 
     @Override
     public int getDefaultX(int screenWidth, int screenHeight) {
@@ -125,12 +132,24 @@ public final class InventoryHudElement implements HudElement {
         return ordered;
     }
 
+    /** A diamond "pot pvp" kit - armor, gapples, ender pearls, blocks, and a wall of splash healing potions. */
     private static List<ItemStack> buildPreviewStacks() {
-        ItemStack healingPotion = PotionContentsComponent.createStack(Items.POTION, Potions.HEALING);
+        ItemStack healingSplash = PotionContentsComponent.createStack(Items.SPLASH_POTION, Potions.HEALING);
         List<ItemStack> preview = new ArrayList<>(36);
-        for (int i = 0; i < 36; i++) {
-            preview.add(healingPotion.copy());
+
+        preview.add(new ItemStack(Items.DIAMOND_HELMET));
+        preview.add(new ItemStack(Items.DIAMOND_CHESTPLATE));
+        preview.add(new ItemStack(Items.DIAMOND_LEGGINGS));
+        preview.add(new ItemStack(Items.DIAMOND_BOOTS));
+        preview.add(new ItemStack(Items.DIAMOND_SWORD));
+        preview.add(new ItemStack(Items.GOLDEN_APPLE, 16));
+        preview.add(new ItemStack(Items.ENDER_PEARL, 16));
+        preview.add(new ItemStack(Items.OBSIDIAN, 64));
+        preview.add(new ItemStack(Items.COBWEB, 64));
+        while (preview.size() < 36) {
+            preview.add(healingSplash.copy());
         }
+
         return List.copyOf(preview);
     }
 }

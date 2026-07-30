@@ -15,11 +15,12 @@ import java.util.List;
  * mixin.locatorheads.LocatorBarMixin} for the actual swap.
  *
  * <p>Ported from Haage001/locator-heads (LGPL-3.0-only, see NOTICE.md) -
- * scoped to its core feature (head-instead-of-icon, size multiplier,
- * optional name label) rather than its full feature set (team-color
- * borders, name fade animations, look-at/player-list-key name-display
- * modes, player include/exclude filters) - real, deliberate scope cut for
- * a "not default anywhere" module, not a partial/broken port.</p>
+ * scoped to its core feature (head-instead-of-icon, distance-based size
+ * falloff, size multiplier, optional name label) rather than its full
+ * feature set (team-color borders, name fade animations, look-at/
+ * player-list-key name-display modes, player include/exclude filters) -
+ * real, deliberate scope cut for a "not default anywhere" module, not a
+ * partial/broken port.</p>
  */
 public final class LocatorHeadsModule extends AbstractModule {
 

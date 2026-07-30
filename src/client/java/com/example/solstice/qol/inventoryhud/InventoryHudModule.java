@@ -31,6 +31,9 @@ public final class InventoryHudModule extends AbstractModule {
 
     @Override protected boolean defaultEnabled() { return false; }
 
+    /** Not default anywhere, including PVP - shows your real inventory contents, which the PVP profile shouldn't force on. */
+    @Override public boolean excludeFromPvpProfile() { return true; }
+
     @Override
     protected void init() {
         // No settings of its own - position/size/visibility live in HudLayoutManager,
