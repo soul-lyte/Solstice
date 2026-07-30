@@ -4,19 +4,25 @@ import com.example.solstice.core.module.AbstractModule;
 import com.example.solstice.core.module.ModuleCategory;
 
 /**
- * NetworkModule - client-side networking efficiency improvements.
+ * NetworkModule ("Multiplayer Optimization" card) - client-side networking
+ * efficiency improvements, merging two previously separate techniques into
+ * one always-on module rather than two overlapping ones.
  *
  * <p>Strategies (all purely client-side, no packet content modification):
  * <ul>
  *   <li>Increase Netty receive and send buffer sizes to reduce syscall overhead</li>
  *   <li>Enable TCP_NODELAY for lower latency on loopback and LAN connections</li>
- *   <li>Coalesce redundant position/look packets when the player hasn't moved
- *       (reduces upstream traffic during AFK - does NOT alter movement
- *       semantics or suppress packets that servers rely on for anti-cheat)</li>
+ *   <li>Skip the redundant per-tick {@code Channel.flush()} call and avoid an
+ *       unnecessary event-loop wake-up for non-flushing sends (see {@code
+ *       ClientConnectionMixin}) - ported from RelativityMC/VMP-fabric's own
+ *       {@code no_flush} mixin (MIT, see NOTICE.md); Netty already flushes on
+ *       its own whenever the channel actually has something to write, so the
+ *       explicit call every tick was pure overhead</li>
  * </ul>
  *
- * <p>Inspired by Krypton, re-implemented natively. No gameplay-affecting
- * packet manipulation is performed.</p>
+ * <p>The buffer/TCP_NODELAY tuning is inspired by Krypton, re-implemented
+ * natively. No gameplay-affecting packet manipulation is performed anywhere
+ * in this module.</p>
  */
 public final class NetworkModule extends AbstractModule {
 
@@ -36,12 +42,13 @@ public final class NetworkModule extends AbstractModule {
     public static NetworkModule getInstance() { return INSTANCE; }
 
     @Override public String getId()          { return "network"; }
-    @Override public String getDisplayName() { return "Network Optimizations"; }
-    @Override public String getDescription() { return "Tunes socket buffers and TCP settings for lower latency and higher throughput."; }
+    @Override public String getDisplayName() { return "Multiplayer Optimization"; }
+    @Override public String getDescription() { return "Tunes socket buffers, TCP settings, and packet flushing for lower latency and higher throughput."; }
 
     @Override
     public java.util.List<String> getSearchKeywords() {
-        return java.util.List.of("krypton", "latency", "ping", "packet compression", "tcp nodelay", "socket buffer");
+        return java.util.List.of("krypton", "vmp", "very many players", "latency", "ping",
+                "packet compression", "tcp nodelay", "socket buffer", "multiplayer optimization");
     }
     @Override public ModuleCategory getCategory() { return ModuleCategory.ADVANCED; }
 

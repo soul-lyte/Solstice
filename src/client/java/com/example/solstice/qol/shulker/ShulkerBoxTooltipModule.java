@@ -20,10 +20,13 @@ import java.util.Optional;
  * see NOTICE.md), then reworked into a three-key combo per direct request:
  * holding {@link #previewKeyCode} (default Left Shift) alone shows a
  * compact, merged-and-deduplicated preview; holding it together with
- * {@link #fullPreviewKeyCode} (default Left Alt) shows the full grid
+ * {@link #fullPreviewKeyCode} (default Left Control) shows the full grid
  * (every slot in its real position, including empty ones); holding all
- * three (also {@link #lockKeyCode}, default Left Control) locks the last
- * full preview in place so the mouse can move away - see {@code
+ * three (also {@link #lockKeyCode}, default Right Control) locks the last
+ * full preview in place so the mouse can move away. None of the three
+ * defaults is Alt - Left Alt held with Left Shift is the Windows keyboard-
+ * layout-switch shortcut, and an earlier default collided with it directly
+ * (see the config-key Javadocs below). See {@code
  * ShulkerTooltipDataMixin} for where the compact/full data is built, and
  * {@code HandledScreenLockOverlayMixin} for where the locked preview
  * actually gets drawn once the mouse is no longer over the original item.
@@ -48,14 +51,25 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
     private static final ShulkerBoxTooltipModule INSTANCE = new ShulkerBoxTooltipModule();
 
     private static final String PREVIEW_KEY_CONFIG = "shulker.preview_key_code";
-    private static final String FULL_PREVIEW_KEY_CONFIG = "shulker.full_preview_key_code";
-    private static final String LOCK_KEY_CONFIG = "shulker.lock_key_code";
+    /**
+     * Config keys bumped to "_v2" - Left Alt (the old Full Preview default) held
+     * together with Left Shift (Compact) is the exact Windows "switch keyboard
+     * layout" shortcut, confirmed by direct report. Since these are raw GLFW
+     * codes persisted straight through ConfigManager (not real KeyBindings),
+     * changing the coded default alone would never migrate an already-persisted
+     * value - same class of gotcha as the vanilla-KeyBinding case documented
+     * elsewhere in this project, just needing a config-key bump instead of a
+     * translation-key bump. Neither new default uses Alt at all, so no
+     * combination of these three keys can ever match that shortcut again.
+     */
+    private static final String FULL_PREVIEW_KEY_CONFIG = "shulker.full_preview_key_code_v2";
+    private static final String LOCK_KEY_CONFIG = "shulker.lock_key_code_v2";
 
     private int previewKeyCode = GLFW.GLFW_KEY_LEFT_SHIFT;
-    private int fullPreviewKeyCode = GLFW.GLFW_KEY_LEFT_ALT;
-    private int lockKeyCode = GLFW.GLFW_KEY_LEFT_CONTROL;
+    private int fullPreviewKeyCode = GLFW.GLFW_KEY_LEFT_CONTROL;
+    private int lockKeyCode = GLFW.GLFW_KEY_RIGHT_CONTROL;
 
-    /** The last stack+data seen while full preview (Shift+Alt) was actually active - the "arming" snapshot a lock freezes from. */
+    /** The last stack+data seen while full preview (Shift+Control) was actually active - the "arming" snapshot a lock freezes from. */
     private ItemStack armedStack = ItemStack.EMPTY;
     private ShulkerTooltipData armedData;
 
@@ -112,8 +126,8 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
     protected void init() {
         ConfigManager cfg = ConfigManager.getInstance();
         previewKeyCode = cfg.getInt(PREVIEW_KEY_CONFIG, GLFW.GLFW_KEY_LEFT_SHIFT);
-        fullPreviewKeyCode = cfg.getInt(FULL_PREVIEW_KEY_CONFIG, GLFW.GLFW_KEY_LEFT_ALT);
-        lockKeyCode = cfg.getInt(LOCK_KEY_CONFIG, GLFW.GLFW_KEY_LEFT_CONTROL);
+        fullPreviewKeyCode = cfg.getInt(FULL_PREVIEW_KEY_CONFIG, GLFW.GLFW_KEY_LEFT_CONTROL);
+        lockKeyCode = cfg.getInt(LOCK_KEY_CONFIG, GLFW.GLFW_KEY_RIGHT_CONTROL);
     }
 
     private void rebindPreview(int keyCode) {
@@ -145,7 +159,7 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
 
     /**
      * Called from {@code ShulkerTooltipDataMixin} every frame the full
-     * (Shift+Alt) preview is actually showing over a real container item -
+     * (Shift+Control) preview is actually showing over a real container item -
      * keeps a live snapshot so a lock (also holding the Lock Key) has
      * something recent to freeze.
      */

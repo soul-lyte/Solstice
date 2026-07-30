@@ -3,6 +3,7 @@ package com.example.solstice.mixin.shulker;
 import com.example.solstice.qol.shulker.ShulkerBoxTooltipModule;
 import com.example.solstice.qol.shulker.ShulkerTooltipData;
 import net.minecraft.block.Block;
+import net.minecraft.block.ChestBlock;
 import net.minecraft.block.ShulkerBoxBlock;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ContainerComponent;
@@ -43,6 +44,7 @@ import java.util.Optional;
 public abstract class ShulkerTooltipDataMixin {
 
     private static final int SHULKER_BOX_SLOTS = 27;
+    private static final int CHEST_SLOTS = 27;
     private static final int UNDYED_SHULKER_BOX_COLOR = 0xFF976797;
     private static final int DEFAULT_BACKGROUND_COLOR = 0xFFFFFFFF;
 
@@ -73,6 +75,14 @@ public abstract class ShulkerTooltipDataMixin {
             totalSlots = SHULKER_BOX_SLOTS;
             DyeColor dye = shulkerBlock.getColor();
             backgroundColor = dye != null ? (0xFF000000 | dye.getEntityColor()) : UNDYED_SHULKER_BOX_COLOR;
+        } else if (block instanceof ChestBlock) {
+            // Chests don't preserve their real contents through normal mining (only an
+            // unopened loot table reference, a completely different component) - this only
+            // ever triggers for a chest stack that genuinely carries real items via
+            // DataComponentTypes.CONTAINER (commands, creative pick-block, etc.), same
+            // gate as everything else here. Padded to a real chest's own capacity, same
+            // reasoning as the shulker box case above.
+            totalSlots = CHEST_SLOTS;
         }
 
         ShulkerTooltipData data = new ShulkerTooltipData(contents, !full, totalSlots, backgroundColor);

@@ -17,6 +17,7 @@
     "hud.BossBarHudAccessor",
     "hud.BossBarHudMixin",
     "hud.InGameHudScoreboardMixin",
+    "input.KeyboardAltShiftMixin",
     "locatorheads.LocatorBarMixin",
     "shulker.ShulkerTooltipDataMixin",
     "shulker.ContainerComponentAppendTooltipMixin",

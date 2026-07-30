@@ -102,6 +102,21 @@ public class SolsticeScreen extends Screen {
     private int moduleMaxScrollRow;
     private int moduleScrollRow;
 
+    /**
+     * Each module card's fully-settled ("natural") Y, parallel to {@link #cards} whenever
+     * the module grid is active (empty for every other tab). {@link #render} temporarily
+     * offsets each card's real Y from this by {@link #scrollAnimOffsetPx}, which decays to
+     * 0 over a short window after every scroll tick - previously the whole row snapped to
+     * its new position in one frame, which read as an instant screen-switch rather than a
+     * scroll. Offsetting the real widget Y (not a matrix translate) was chosen deliberately
+     * over wrapping the render call in a transform/scissor - see the reverted attempt at
+     * exactly that for the "partial row" feature, which broke the category tabs outright.
+     */
+    private final List<Integer> cardNaturalY = new ArrayList<>();
+    private float scrollAnimOffsetPx;
+    private long lastScrollAnimNanos;
+    private static final float SCROLL_ANIM_DECAY_PER_SECOND = 16f;
+
     /** Pixel-based scroll for the Textures tab - see {@link #rebuildTexturesCards}. */
     private int texturesViewportTop;
     private int texturesScrollOffset;
@@ -192,6 +207,7 @@ public class SolsticeScreen extends Screen {
         // own field Javadocs for why they must survive every rebuild)
         cards.forEach(this::remove);
         cards.clear();
+        cardNaturalY.clear();
         profileRowLabels.clear();
 
         int contentTop = HEADER_H + TAB_H + CARD_GAP;
@@ -262,6 +278,7 @@ public class SolsticeScreen extends Screen {
                         client.setScreen(new ModuleDetailScreen(this, m));
                     });
             cards.add(card);
+            cardNaturalY.add(cy);
             addDrawableChild(card);
         }
     }
@@ -583,6 +600,8 @@ public class SolsticeScreen extends Screen {
                 && mouseY >= moduleContentViewportTop && mouseY < footerButtonY) {
             int newScrollRow = (int) Math.max(0, Math.min(moduleMaxScrollRow, moduleScrollRow - Math.signum(verticalAmount)));
             if (newScrollRow != moduleScrollRow) {
+                int rowStep = ModuleCardWidget.HEIGHT + CARD_GAP;
+                scrollAnimOffsetPx += (newScrollRow - moduleScrollRow) * rowStep;
                 moduleScrollRow = newScrollRow;
                 rebuildCards();
             }
@@ -665,6 +684,7 @@ public class SolsticeScreen extends Screen {
             drawMoreBelowHint(context);
         }
 
+        applyScrollAnimation();
         super.render(context, mouseX, mouseY, delta);
     }
 
@@ -672,6 +692,30 @@ public class SolsticeScreen extends Screen {
         String hint = "v";
         int hintW = textRenderer.getWidth(hint);
         context.drawText(textRenderer, hint, (width - hintW) / 2, footerButtonY - 11, ColorPalette.TEXT_SECONDARY, false);
+    }
+
+    /**
+     * Decays {@link #scrollAnimOffsetPx} toward 0 by real elapsed time (not tick delta -
+     * this runs every frame, not every tick) and writes each module card's Y as its
+     * settled {@link #cardNaturalY} plus whatever offset remains, so a scroll tick's
+     * jump plays out as a short slide instead of an instant snap.
+     */
+    private void applyScrollAnimation() {
+        long now = System.nanoTime();
+        float dt = lastScrollAnimNanos == 0 ? 0f : Math.min(0.1f, (now - lastScrollAnimNanos) / 1_000_000_000f);
+        lastScrollAnimNanos = now;
+
+        if (scrollAnimOffsetPx != 0f) {
+            scrollAnimOffsetPx *= (float) Math.exp(-SCROLL_ANIM_DECAY_PER_SECOND * dt);
+            if (Math.abs(scrollAnimOffsetPx) < 0.5f) {
+                scrollAnimOffsetPx = 0f;
+            }
+        }
+
+        int offset = Math.round(scrollAnimOffsetPx);
+        for (int i = 0; i < cards.size() && i < cardNaturalY.size(); i++) {
+            cards.get(i).setY(cardNaturalY.get(i) + offset);
+        }
     }
 
     @Override

@@ -48,6 +48,13 @@ which files this applies to.
 - **armor-hud** (uku3lig) - https://github.com/uku3lig/armor-hud - MIT. The
   bundled `warn.png` low-durability warning icon is copied directly from
   this repo (`assets/solstice/textures/gui/armor_hud_warning.png`).
+- **VMP** (RelativityMC) - https://github.com/RelativityMC/VMP-fabric - MIT.
+  Only its `no_flush` networking optimization was ported (skipping a
+  redundant per-tick socket flush and an unnecessary event-loop wakeup on
+  non-flushing sends), merged into the existing `NetworkModule`. VMP's own
+  primary focus - server-side chunk/entity/player-tracking scaling for
+  high player counts - doesn't apply to a singleplayer-facing client mod
+  and was not ported.
 
 ## Apache-2.0 (compatible with Solstice's own license, still attributed)
 
