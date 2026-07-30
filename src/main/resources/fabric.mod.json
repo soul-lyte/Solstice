@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "solstice",
+  "version": "${version}",
+  "name": "Solstice",
+  "description": "An all-in-one optimization client for Fabric Minecraft 1.21.11 - maximum FPS, lower RAM, faster startup.",
+  "authors": [
+    "zSouul"
+  ],
+  "contact": {
+    "homepage": "https://github.com/soul-lyte/solstice",
+    "sources":  "https://github.com/soul-lyte/solstice",
+    "issues":   "https://github.com/soul-lyte/solstice/issues"
+  },
+  "license": ["MIT", "LGPL-3.0-only", "MPL-2.0"],
+  "icon": "assets/solstice/icon.png",
+  "environment": "client",
+  "accessWidener": "solstice.accesswidener",
+  "entrypoints": {
+    "main": [
+      "com.example.solstice.SolsticeMod"
+    ],
+    "client": [
+      "com.example.solstice.SolsticeClient"
+    ]
+  },
+  "mixins": [
+    "solstice.mixins.json",
+    "solstice.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "fabric-api":   "*",
+    "minecraft":    "1.21.11",
+    "java":         ">=21"
+  },
+  "recommends": {},
+  "suggests":   {},
+  "breaks":     {},
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.discord": "https://discord.gg/solstice"
+      }
+    }
+  }
+}

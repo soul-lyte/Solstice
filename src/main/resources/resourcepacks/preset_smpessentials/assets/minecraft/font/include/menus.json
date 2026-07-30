@@ -1,0 +1,12 @@
+{
+  //By MrOrdenador
+  "providers": [
+    {
+			"type": "bitmap",
+			"file": "mrordenador:mrordenador.png",
+				"ascent": 0,
+				"height": 55,
+                                "chars": ["\u6E05\u9152"]
+    }
+  ]
+}

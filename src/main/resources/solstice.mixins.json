@@ -1,0 +1,18 @@
+{
+  "required": false,
+  "package": "com.example.solstice.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "mixins": [
+    "hunger.HungerManagerAccessor",
+    "optimization.ExplosionImplMixin",
+    "optimization.HandSwingSkipMixin",
+    "optimization.IdentifierToStringCacheMixin",
+    "optimization.PowderSnowCheckOrderMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

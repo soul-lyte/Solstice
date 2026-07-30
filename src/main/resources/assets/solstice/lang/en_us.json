@@ -1,0 +1,38 @@
+{
+  "key.category.solstice.general": "Solstice",
+
+  "key.solstice.open_gui": "Open Solstice Settings",
+  "key.solstice.zoom": "Zoom",
+
+  "solstice.module.render.name":           "Render Optimizations",
+  "solstice.module.render.desc":           "Reduces GPU overhead via minimized-sleep, dynamic render distance, and batched draw-call pruning.",
+
+  "solstice.module.entity_culling.name":   "Entity Culling",
+  "solstice.module.entity_culling.desc":   "Skips rendering entities hidden behind terrain, reducing GPU draw calls significantly.",
+
+  "solstice.module.particle_limiter.name": "Particle Limiter",
+  "solstice.module.particle_limiter.desc": "Caps maximum live particles to prevent particle-heavy scenes from tanking frame time.",
+
+  "solstice.module.chunk.name":            "Chunk Optimizations",
+  "solstice.module.chunk.desc":            "Prioritizes nearby chunk builds, throttles distant rebuilds, and skips empty section meshing.",
+
+  "solstice.module.memory.name":           "Memory Optimization",
+  "solstice.module.memory.desc":           "Trims heap usage via intelligent GC hints and cache pruning to reduce GC pause stutters.",
+
+  "solstice.module.network.name":          "Network Optimizations",
+  "solstice.module.network.desc":          "Tunes socket buffers and TCP settings for lower latency and higher throughput.",
+
+  "solstice.module.startup.name":          "Startup Optimizations",
+  "solstice.module.startup.desc":          "Reduces splash-screen minimum display time to shorten time-to-main-menu.",
+
+  "solstice.screen.title":                 "Solstice Settings",
+  "solstice.screen.footer.ram":            "RAM:",
+  "solstice.screen.footer.modules":        "Modules active:",
+
+  "solstice.category.rendering":           "Rendering",
+  "solstice.category.memory":              "Memory",
+  "solstice.category.chunk":               "Chunk Loading",
+  "solstice.category.network":             "Networking",
+  "solstice.category.startup":             "Startup",
+  "solstice.category.interface":           "Interface"
+}

@@ -1,0 +1,57 @@
+{
+	"credit": "Made with Blockbench",
+	"textures": {
+		"0": "item/breezerod",
+		"particle": "breezerod"
+	},
+	"elements": [
+		{
+			"from": [7, 0, 7],
+			"to": [9, 12, 9],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7, 0, 7]},
+			"faces": {
+				"north": {"uv": [0, 0, 2, 12], "texture": "#0"},
+				"east": {"uv": [2, 0, 4, 12], "texture": "#0"},
+				"south": {"uv": [4, 0, 6, 12], "texture": "#0"},
+				"west": {"uv": [6, 0, 8, 12], "texture": "#0"},
+				"up": {"uv": [10, 2, 8, 0], "texture": "#0"},
+				"down": {"uv": [10, 2, 8, 4], "texture": "#0"}
+			}
+		}
+	],
+	"display": {
+		"thirdperson_righthand": {
+			"translation": [0, 2, 0.75],
+			"scale": [0.90039, 0.90039, 0.90039]
+		},
+		"thirdperson_lefthand": {
+			"translation": [0, 2, 0.75],
+			"scale": [0.90039, 0.90039, 0.90039]
+		},
+		"firstperson_righthand": {
+			"rotation": [-3.29, -0.4, 7.25],
+			"translation": [3.5, 3.5, 0]
+		},
+		"firstperson_lefthand": {
+			"rotation": [-3.29, -0.4, 7.25],
+			"translation": [3.5, 3.5, 0]
+		},
+		"ground": {
+			"rotation": [25.62, 7.38, 37.08],
+			"translation": [0, 3.25, 0]
+		},
+		"gui": {
+			"rotation": [21.86, 18.53, -45.68],
+			"translation": [1.75, 2, 0],
+			"scale": [1.375, 1.375, 1.375]
+		},
+		"head": {
+			"translation": [0, 14.75, 0]
+		},
+		"fixed": {
+			"rotation": [0, 0, -48.5],
+			"translation": [2, 2.25, 0],
+			"scale": [1.48633, 1.48633, 1.48633]
+		}
+	}
+}

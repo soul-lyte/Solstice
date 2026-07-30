@@ -1,0 +1,12 @@
+accessWidener v2 named
+
+# SimpleOption.Callbacks is package-private in net.minecraft.client.option
+# (confirmed via javap - no explicit modifier on the nested interface).
+# Widened to public so mixin.optimization.SimpleOptionAccessor can name it
+# directly in its own accessor method signatures (view-distance slider
+# uncap, ported from C2ME's c2me-client-uncapvd - see NOTICE.md). Does not
+# touch the field's own access (Mixin's @Accessor bypasses that separately,
+# via direct bytecode injection into SimpleOption itself) - only the nested
+# type's own visibility, which is a plain source-level accessibility
+# requirement, unrelated to the field.
+accessible class net/minecraft/client/option/SimpleOption$Callbacks

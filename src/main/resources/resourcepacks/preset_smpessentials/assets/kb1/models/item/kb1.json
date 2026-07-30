@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/netherite_sword",
+  "textures": {
+    "layer0": "kb1:item/knockback1"
+  }
+}

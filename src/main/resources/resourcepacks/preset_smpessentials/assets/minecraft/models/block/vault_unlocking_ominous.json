@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/template_vault",
+  "textures": {
+    "bottom": "minecraft:block/vault_bottom_ominous",
+    "front": "minecraft:block/vault_front_unlocking_ominous",
+    "side": "minecraft:block/vault_side_unlocking_ominous",
+    "top": "minecraft:block/vault_top_ominous"
+  }
+}
