@@ -1,0 +1,158 @@
+package com.example.solstice.performance.render;
+
+import com.example.solstice.core.config.ConfigManager;
+import com.example.solstice.core.module.AbstractModule;
+import com.example.solstice.core.module.ModuleCategory;
+import com.example.solstice.core.module.ModuleSetting;
+import com.example.solstice.core.util.TimeUtil;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * EntityCullingModule - skips rendering entities occluded by terrain
+ * (raycast visibility test) or beyond a max render distance.
+ *
+ * <p>Hooked via {@code mixin.render.EntityRenderManagerMixin} on {@code
+ * EntityRenderManager.shouldRender} - the real per-frame per-entity decision
+ * point in 1.21.11's post-1.21.9-rework render pipeline (replaces the old,
+ * now-nonexistent {@code EntityRenderer.render(Entity, ...)} target this
+ * module's Mixin used to guess at). Cancelling here skips both render-state
+ * extraction and draw submission for that entity, not just the draw call.</p>
+ *
+ * <p>Each entity re-checks its own occlusion independently, staggered by its
+ * own last-checked timestamp, rather than re-raycasting every entity in the
+ * world in one synchronous burst every interval - the latter is a real stutter
+ * risk in mob-dense areas (farms) that this was rewritten to avoid.</p>
+ *
+ * <p>Client-only: uses {@link MinecraftClient} and client rendering types.
+ * Lives in src/client/java.</p>
+ */
+public final class EntityCullingModule extends AbstractModule {
+
+    private static final EntityCullingModule INSTANCE = new EntityCullingModule();
+
+    /** How long a cached visibility result stays valid before re-checking that entity, in ms. */
+    public static int cullingIntervalMs = 50;
+
+    /** Entities beyond this distance (blocks) are always culled. */
+    public static int maxRenderDistanceBlocks = 64;
+
+    /** Full-cache sweep interval - bounds memory from despawned entities' stale entries. */
+    private static final long CACHE_SWEEP_INTERVAL_MS = 30_000L;
+
+    private final Map<UUID, Boolean> visibilityCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastCheckedMs = new ConcurrentHashMap<>();
+    private long lastSweepMs = 0;
+
+    private EntityCullingModule() {}
+
+    public static EntityCullingModule getInstance() { return INSTANCE; }
+
+    @Override public String getId()          { return "entity_culling"; }
+    @Override public String getDisplayName() { return "Entity Culling"; }
+    @Override public String getDescription() { return "Skips rendering entities hidden behind terrain, reducing GPU draw calls significantly."; }
+
+    @Override
+    public java.util.List<String> getSearchKeywords() {
+        return java.util.List.of("entityculling", "occlusion culling", "mob lag", "hidden entities", "entity lag");
+    }
+    @Override public ModuleCategory getCategory() { return ModuleCategory.ADVANCED; }
+
+    @Override
+    protected void init() {
+        cullingIntervalMs = ConfigManager.getInstance()
+                .getInt("entity_culling.interval_ms", 50);
+        maxRenderDistanceBlocks = ConfigManager.getInstance()
+                .getInt("entity_culling.max_distance", 64);
+    }
+
+    @Override
+    public java.util.List<ModuleSetting> getSettings() {
+        return java.util.List.of(
+                new ModuleSetting.IntSetting(
+                        "Recheck Interval (ms)",
+                        "How long a cached occlusion result for one entity stays trusted before checking it again.",
+                        16, 500,
+                        () -> cullingIntervalMs,
+                        v -> { cullingIntervalMs = v; ConfigManager.getInstance().set("entity_culling.interval_ms", v); }),
+                new ModuleSetting.IntSetting(
+                        "Max Render Distance (blocks)",
+                        "Entities farther than this are always culled, regardless of visibility.",
+                        16, 128,
+                        () -> maxRenderDistanceBlocks,
+                        v -> { maxRenderDistanceBlocks = v; ConfigManager.getInstance().set("entity_culling.max_distance", v); })
+        );
+    }
+
+    /**
+     * Called from {@code EntityRenderManagerMixin} after vanilla's own frustum
+     * check already returned {@code true} for this entity.
+     *
+     * @return {@code true} if the entity should be rendered, {@code false} to skip.
+     */
+    public boolean shouldRender(Entity entity, MinecraftClient client) {
+        if (!isEnabled() || client.player == null) return true;
+        if (entity == client.player) return true;
+
+        double distSq = client.player.squaredDistanceTo(entity);
+        double maxDistSq = (double) maxRenderDistanceBlocks * maxRenderDistanceBlocks;
+        if (distSq > maxDistSq) return false;
+
+        sweepStaleEntriesIfDue();
+
+        UUID id = entity.getUuid();
+        long now = TimeUtil.nowMs();
+        Long checkedAt = lastCheckedMs.get(id);
+        if (checkedAt == null || now - checkedAt >= cullingIntervalMs) {
+            boolean visible = !isOccluded(entity.getBoundingBox(), client);
+            visibilityCache.put(id, visible);
+            lastCheckedMs.put(id, now);
+            return visible;
+        }
+
+        return visibilityCache.getOrDefault(id, true);
+    }
+
+    private void sweepStaleEntriesIfDue() {
+        long now = TimeUtil.nowMs();
+        if (!TimeUtil.elapsed(lastSweepMs, CACHE_SWEEP_INTERVAL_MS)) return;
+        lastSweepMs = now;
+        visibilityCache.clear();
+        lastCheckedMs.clear();
+    }
+
+    private boolean isOccluded(Box box, MinecraftClient client) {
+        if (client.world == null) return false;
+
+        Vec3d cameraPos = client.gameRenderer.getCamera().getCameraPos();
+        Vec3d center = box.getCenter();
+        RaycastContext ctx = new RaycastContext(
+                cameraPos, center,
+                RaycastContext.ShapeType.VISUAL,
+                RaycastContext.FluidHandling.NONE,
+                ShapeContext.absent()
+        );
+
+        BlockHitResult result = client.world.raycast(ctx);
+        if (result.getType() == HitResult.Type.MISS) return false;
+
+        double hitDistSq    = result.getPos().squaredDistanceTo(cameraPos);
+        double entityDistSq = center.squaredDistanceTo(cameraPos);
+        return hitDistSq < entityDistSq - 0.5;
+    }
+
+    public void clearCache() {
+        visibilityCache.clear();
+        lastCheckedMs.clear();
+    }
+}
