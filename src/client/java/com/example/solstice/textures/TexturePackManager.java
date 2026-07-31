@@ -66,8 +66,10 @@ public final class TexturePackManager {
      */
     public boolean applyPersistedSelections(List<TextureSlot> slots) {
         boolean anyEnabled = false;
-        for (TextureSlot slot : slots) {
-            TextureOption option = slot.getOptions().get(getSelectedIndex(slot));
+        for (TextureSlot slot : DynamicTextureRegistry.getInstance().mergeSlots(slots)) {
+            int index = getSelectedIndex(slot);
+            if (index >= slot.getOptions().size()) continue;
+            TextureOption option = slot.getOptions().get(index);
             if (!option.isVanilla()) {
                 setPackEnabled(option.packId(), true);
                 anyEnabled = true;
@@ -102,6 +104,10 @@ public final class TexturePackManager {
     }
 
     public void setPackEnabled(String packId, boolean enabled) {
+        if (DynamicTextureRegistry.getInstance().lookup(packId) != null) {
+            DynamicTextureRegistry.getInstance().applyDynamicOption(packId, enabled);
+            return;
+        }
         ResourcePackManager manager = MinecraftClient.getInstance().getResourcePackManager();
         String profileId = SolsticeMod.MOD_ID + ":" + packId;
         if (enabled) {

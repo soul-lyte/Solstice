@@ -16,21 +16,26 @@ import java.util.List;
  * when they fall outside the server's real view distance, instead of
  * popping out the instant they unload.
  *
- * <p>Unlike the old implementation, there is no separate "Extra Chunks"
- * number. {@link com.example.solstice.mixin.viewdistance.GameOptionsMixin}
- * makes {@code GameOptions.getClampedViewDistance()} return the client's own
- * raw render-distance option instead of clamping it to the server's real
- * radius - so raising the existing (already-uncapped) Render Distance
- * slider in Video Settings directly controls how far retained chunks
- * extend, with fog/far-plane/render-storage sizing all automatically
- * agreeing since they all read from that same one method.</p>
- *
- * <p>In singleplayer, {@link
- * com.example.solstice.mixin.viewdistance.IntegratedServerMixin} keeps the
- * embedded server's own real chunk-sending radius fixed at {@link
- * #serverViewDistanceOverwrite} regardless of how high the client's render
- * distance is raised - otherwise the server would just send real data out to
- * the same inflated distance, leaving nothing for retention to fill in.</p>
+ * <p><b>Two independent, additive sliders</b> (both on Video Settings, right
+ * next to each other): <b>Render Distance</b> is the real radius - it's
+ * vanilla's own render-distance option, unchanged in meaning, sent to real
+ * servers exactly as before and used by the singleplayer integrated server
+ * to decide how far to actually generate/send real chunk data (nothing new
+ * needed there - {@code IntegratedServer} already syncs its own tracking
+ * distance to this option on its own). <b>Retention Distance</b> is a purely
+ * additive number of extra rings beyond that, filled with cached/retained
+ * data where available. {@link
+ * com.example.solstice.mixin.viewdistance.GameOptionsMixin} makes {@code
+ * GameOptions.getClampedViewDistance()} - the one method fog/far-plane/
+ * render-storage sizing all read from - return {@code renderDistance +
+ * retentionDistance}, so raising either slider does exactly what its name
+ * says and nothing else. (The old design used a single Render Distance
+ * slider as both "how far real data extends" AND "the total visual cap,"
+ * with a second, separately-scoped "Singleplayer Real Chunk Radius" setting
+ * that only affected singleplayer - genuinely confusing since the two
+ * numbers didn't compose the way their names implied. This replaces both
+ * with one clear additive relationship that also works identically in
+ * multiplayer, not just singleplayer.)</p>
  *
  * <p><b>Known limitation, same as upstream Bobby</b>: the retention system
  * only attaches itself when a world's {@code ClientChunkManager} is first
@@ -41,12 +46,10 @@ public final class ViewDistanceModule extends AbstractModule {
 
     private static final ViewDistanceModule INSTANCE = new ViewDistanceModule();
 
-    /** Fixed real chunk-sending radius for the singleplayer integrated server. 0 = no override. */
-    public static int serverViewDistanceOverwrite = 8;
-
     private int unloadDelaySecs = 30;
     private boolean taintFakeChunks = false;
     private boolean skipBlockEntities = true;
+    private int retentionDistance = 8;
 
     private ViewDistanceModule() {}
 
@@ -54,7 +57,7 @@ public final class ViewDistanceModule extends AbstractModule {
 
     @Override public String getId()          { return "view_distance"; }
     @Override public String getDisplayName() { return "Chunk Retention"; }
-    @Override public String getDescription() { return "Keeps terrain you've already visited on screen instead of it popping out immediately. How far it extends is controlled by the Render Distance slider in Video Settings, not a separate setting here."; }
+    @Override public String getDescription() { return "Keeps terrain you've already visited on screen instead of it popping out immediately. How far it extends beyond your real Render Distance is controlled by the Retention Distance slider in Video Settings."; }
 
     @Override
     public List<String> getSearchKeywords() {
@@ -81,13 +84,7 @@ public final class ViewDistanceModule extends AbstractModule {
                         "Taint Fake Chunks",
                         "Debug aid: dims the lighting on cached chunks so you can visually tell them apart from real terrain.",
                         () -> taintFakeChunks,
-                        this::setTaintFakeChunks),
-                new ModuleSetting.IntSetting(
-                        "Singleplayer Real Chunk Radius",
-                        "How far ahead of you, into terrain you haven't visited yet, the singleplayer world actually generates and sends real data - independent of your (uncapped) Render Distance slider. Raising this closes the gap between unexplored terrain ahead of you and already-explored terrain behind you (which can always extend to the full Render Distance for free from cache), at the cost of real chunk generation load. Setting it equal to Render Distance removes the gap entirely.",
-                        2, 64,
-                        () -> serverViewDistanceOverwrite,
-                        this::setServerViewDistanceOverwrite)
+                        this::setTaintFakeChunks)
         );
     }
 
@@ -96,7 +93,7 @@ public final class ViewDistanceModule extends AbstractModule {
         unloadDelaySecs = ConfigManager.getInstance().getInt("view_distance.unload_delay_secs", 30);
         skipBlockEntities = ConfigManager.getInstance().getBoolean("view_distance.skip_block_entities", true);
         taintFakeChunks = ConfigManager.getInstance().getBoolean("view_distance.taint_fake_chunks", false);
-        serverViewDistanceOverwrite = ConfigManager.getInstance().getInt("view_distance.server_view_distance", 8);
+        retentionDistance = ConfigManager.getInstance().getInt("view_distance.retention_distance", 8);
     }
 
     public int getUnloadDelaySecs() { return unloadDelaySecs; }
@@ -120,8 +117,10 @@ public final class ViewDistanceModule extends AbstractModule {
         ConfigManager.getInstance().set("view_distance.taint_fake_chunks", value);
     }
 
-    public void setServerViewDistanceOverwrite(int value) {
-        serverViewDistanceOverwrite = value;
-        ConfigManager.getInstance().set("view_distance.server_view_distance", value);
+    public int getRetentionDistance() { return retentionDistance; }
+
+    public void setRetentionDistance(int value) {
+        retentionDistance = value;
+        ConfigManager.getInstance().set("view_distance.retention_distance", value);
     }
 }

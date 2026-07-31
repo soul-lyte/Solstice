@@ -81,26 +81,20 @@ which files this applies to.
   (sales, paywalled builds, etc.), any code adapted from this source must be
   removed or replaced first.
 
-## Unlicensed bundled resource packs
+## Removed: previously-bundled resource packs with no redistribution license
 
-Three bundled texture packs came without a license file and their status is
-unresolved - they are not cleared for public redistribution:
-
-- **Tiny Tools** by jahirtrap - bundled as `preset_tiny_tools`,
-  `tools_tiny_tools`.
-- **Vanilla+** by Marlowww - bundled as `preset_vanillaplus`,
-  `tools_vanillaplus`, `utilities_vanillaplus`, `armor_vanillaplus`.
-- **Tournament [16x]**, credited (per its own `credits.txt`) to Saki 16x/Keno,
-  Cuboids/Cryokine, Fabled/Belmu, Alius, Skeletony, Kemiu, ovaszos_uborka,
-  WeNAN Studios, and Clyred for different pieces - bundled as
-  `preset_tournament`, `tools_tournament`, `utilities_tournament`,
-  `armor_tournament`.
-- **SMP Essentials** by MrOrdenador - bundled as `preset_smpessentials`,
-  and its "KB1" conditional sword model (Knockback I netherite swords get a
-  distinct texture) as `tools_kb1_sword`.
-
-These are not published on Modrinth or any other public distribution channel
-until permission is obtained from each creator, or the packs are removed.
+Five texture packs (Tiny Tools by jahirtrap, Vanilla+ by Marlowww, Tournament
+[16x] - credited per its own `credits.txt` to Saki 16x/Keno, Cuboids/Cryokine,
+Fabled/Belmu, Alius, Skeletony, Kemiu, ovaszos_uborka, WeNAN Studios, and
+Clyred for different pieces - SMP Essentials by MrOrdenador, and Mini Sword)
+used to be bundled directly inside the jar as Presets and Advanced-row options. None of
+them ever came with a license file, so redistributing them was never actually
+cleared. Removed entirely on this branch rather than left flagged: Solstice no
+longer bundles or redistributes any third-party texture pack. If you have one
+of these packs installed yourself, its content now shows up automatically in
+the Textures tab's Advanced row via runtime detection (`DynamicTextureRegistry`)
+instead - nothing is copied into Solstice's own jar, only read locally from
+files you already obtained.
 
 ## Closed-source, not copied - built from the public feature description only
 
