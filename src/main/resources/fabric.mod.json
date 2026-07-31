@@ -3,7 +3,7 @@
   "id": "solstice",
   "version": "${version}",
   "name": "Solstice",
-  "description": "An all-in-one optimization client for Fabric Minecraft 1.21.11 - maximum FPS, lower RAM, faster startup.",
+  "description": "One mod instead of thirty: solid performance tuning plus every quality-of-life feature you'd want for PvP and SMP, bundled into a single client for Fabric Minecraft 1.21.11.",
   "authors": [
     "zSouul"
   ],

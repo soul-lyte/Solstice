@@ -1,11 +1,24 @@
 # ☀ Solstice
 
-**An all-in-one optimization + quality-of-life client for Fabric Minecraft 1.21.11**
+**Stop building the same 30-mod pack every time you make a new instance.**
 
-Solstice replaces dozens of separate mods with one cohesive, modular client: performance
-optimizations, quality-of-life features, a HUD editor, texture pack management, and a
-profile system for switching between saved setups instantly - all sharing the same
-config, rendering, and module framework.
+Solstice is one mod that replaces the pile of separate ones you'd normally hunt down and
+reinstall on every fresh instance - performance tuning, PvP/SMP quality-of-life features,
+a HUD editor, texture pack management, and a profile system for switching between saved
+setups instantly, all sharing one config, one settings screen, and one module framework.
+
+It's not trying to be the single most extreme optimization mod out there - if squeezing
+out the absolute last frame is your whole goal, dedicated performance mods will still
+edge it out. What Solstice actually does is give a genuinely solid performance boost
+*and* the full set of PvP/SMP/solo quality-of-life features you'd normally cobble
+together from a dozen different mods, all in one jar, with sane defaults, so you can drop
+it into a new instance and just start playing instead of spending an hour on Modrinth
+first.
+
+**Who this is for:** people who spin up new instances often and are tired of rebuilding
+the same modpack every time, and people who aren't sure which mods they even need for a
+new playthrough. If you already run a hand-tuned stack of a dozen specialized mods
+picked for your exact setup, Solstice won't beat that - it's built for everyone else.
 
 ---
 
@@ -54,31 +67,20 @@ which feature, and its license.
 
 ---
 
-## Requirements
+## Installation
 
-| Dependency | Version |
-|---|---|
-| Java | 21+ |
-| Minecraft | 1.21.11 |
-| Fabric Loader | 0.19.3+ |
-| Fabric API | 0.141.4+1.21.11 |
-| Fabric Loom | 1.16.x |
+1. Install [Fabric Loader](https://fabricmc.net/use/) 0.19.3+ for Minecraft **1.21.11
+   exactly** - the version is pinned, not a range, so other 1.21.x releases aren't
+   guaranteed compatible.
+2. Download [Fabric API](https://modrinth.com/mod/fabric-api) 0.141.4+1.21.11 (or newer)
+   and Solstice, both for 1.21.11.
+3. Drop both `.jar` files into your instance's `mods` folder.
+4. Launch the game, then press **Right Shift** in-game to open Solstice's settings and
+   turn on whatever you actually want - most features are off by default so nothing
+   changes until you ask for it.
 
-Minecraft version is pinned exactly, not a range - a build compiled against one patch
-version isn't guaranteed compatible with another.
-
----
-
-## Build
-
-```bash
-git clone https://github.com/soul-lyte/Solstice.git
-cd Solstice
-gradle build
-```
-
-The compiled JAR lands in `build/libs/`. Drop it into your `.minecraft/mods/` folder
-alongside Fabric API.
+That's it - no separate config file to edit, no other dependencies to track down. Java
+21+ is required (bundled with recent Minecraft launchers, so most people already have it).
 
 ---
 
@@ -103,6 +105,29 @@ Solstice is a **pure optimization + QOL client**. It never modifies:
 
 All changes are graphical, informational, or transport-layer only, and are safe on any
 server.
+
+---
+
+## Building from source
+
+Most users just want the [Installation](#installation) steps above - this is only for
+building the jar yourself.
+
+```bash
+git clone https://github.com/soul-lyte/Solstice.git
+cd Solstice
+gradle build
+```
+
+The compiled JAR lands in `build/libs/`.
+
+| Dependency | Version |
+|---|---|
+| Java | 21+ |
+| Minecraft | 1.21.11 |
+| Fabric Loader | 0.19.3+ |
+| Fabric API | 0.141.4+1.21.11 |
+| Fabric Loom | 1.16.x |
 
 ---
 
