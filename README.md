@@ -1,27 +1,11 @@
 # ☀ Solstice
 
-**Stop building the same 30-mod pack every time you make a new instance.**
+**One mod instead of the 30-mod pack you rebuild on every new instance.** Solid
+performance tuning plus every PvP/SMP/solo quality-of-life feature you actually want, in
+one jar with sane defaults. Not the single most hardcore optimization mod out there -
+just the one you don't have to think about.
 
-Solstice is one mod that replaces the pile of separate ones you'd normally hunt down and
-reinstall on every fresh instance - performance tuning, PvP/SMP quality-of-life features,
-a HUD editor, texture pack management, and a profile system for switching between saved
-setups instantly, all sharing one config, one settings screen, and one module framework.
-
-It's not trying to be the single most extreme optimization mod out there - if squeezing
-out the absolute last frame is your whole goal, dedicated performance mods will still
-edge it out. What Solstice actually does is give a genuinely solid performance boost
-*and* the full set of PvP/SMP/solo quality-of-life features you'd normally cobble
-together from a dozen different mods, all in one jar, with sane defaults, so you can drop
-it into a new instance and just start playing instead of spending an hour on Modrinth
-first.
-
-**Who this is for:** people who spin up new instances often and are tired of rebuilding
-the same modpack every time, and people who aren't sure which mods they even need for a
-new playthrough. If you already run a hand-tuned stack of a dozen specialized mods
-picked for your exact setup, Solstice won't beat that - it's built for everyone else.
-
-Requires **[Fabric API](https://modrinth.com/mod/fabric-api)** - that's the only other
-mod you need alongside it.
+Requires **[Fabric API](https://modrinth.com/mod/fabric-api)**, nothing else.
 
 ---
 
