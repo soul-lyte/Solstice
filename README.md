@@ -20,67 +20,31 @@ the same modpack every time, and people who aren't sure which mods they even nee
 new playthrough. If you already run a hand-tuned stack of a dozen specialized mods
 picked for your exact setup, Solstice won't beat that - it's built for everyone else.
 
+Requires **[Fabric API](https://modrinth.com/mod/fabric-api)** - that's the only other
+mod you need alongside it.
+
 ---
 
 ## Features
 
-### Performance (Advanced tab)
-
-Always-on tuning plus toggleable optimizations: render-distance/minimized-window
-handling, particle rate limiting, GC-hint memory management, network socket tuning,
-entity culling, startup speedups, and view-distance handling. Three built-in performance
-profiles - **Lite**, **Balanced**, **Aggressive** - apply a whole tuned combination at
-once, plus unlimited saved Custom profiles.
-
-### Quality of Life
-
-- **Shulker Box Tooltip** - hold a key combo to preview a container's contents as a real
-  icon grid instead of vanilla's plain-text list, with a compact (merged, deduplicated)
-  and full (every slot) mode, and a lockable frozen preview.
-- **Chat Heads** - player skin heads next to chat messages.
-- **Locator Heads** - nearby players shown as head icons around the XP bar.
-- **Armor HUD** - real worn armor pieces rendered next to the hotbar.
-- **Inventory HUD** - your inventory shown as a small movable icon grid on screen.
-- **Combat Hitbox** - an outline around nearby entities, highlighting whichever one is
-  in your crosshair. Purely visual - never changes actual hitboxes, reach, or combat.
-- **AppleSkin-style hunger overlay**, **dynamic crosshair**, **zoom**, **fullbright**,
-  **status effect timer**, **no blindness/nausea**, **view model customization**, and a
-  bundle of visual tweaks (no fog, low fire, small totem pop, pull indicators, and more).
-
-### HUD Manager
-
-A free-drag HUD editor (FPS/RAM widgets, a real repositioned Boss Bar, a real
-repositioned Scoreboard sidebar, a free-text Watermark, Inventory HUD) with per-element
-visibility toggles and one master switch for the whole overlay layer.
-
-### Textures tab
-
-- **Presets** - whole real resource packs, one click to activate, including packs you add
-  yourself via a native file/folder picker.
-- **Advanced** - independent per-category swaps (Tools, Utilities, Armor, GUI, Fonts),
-  mixable with whichever Preset is active.
-- **Custom combos** - save a Preset + Advanced-row combination as a named, reapplicable
-  preset of your own, the same way Custom performance/visual profiles work.
+- **Performance** - always-on tuning (render-distance/minimized-window handling,
+  particle rate limiting, GC-hint memory management, network socket tuning, entity
+  culling, startup speedups, view-distance handling) plus three built-in profiles -
+  **Lite**, **Balanced**, **Aggressive** - and unlimited saved Custom ones.
+- **Quality of Life** - Shulker Box Tooltip (icon-grid container preview), Chat Heads,
+  Locator Heads, Armor HUD, Inventory HUD, Combat Hitbox (crosshair-target outline,
+  purely visual), AppleSkin-style hunger overlay, dynamic crosshair, zoom, fullbright,
+  status effect timer, no blindness/nausea, view model customization, and a bundle of
+  visual tweaks (no fog, low fire, small totem pop, pull indicators, and more).
+- **HUD Manager** - free-drag editor for the FPS/RAM widgets, a real repositioned Boss
+  Bar and Scoreboard, a free-text Watermark, and Inventory HUD, with per-element
+  visibility toggles and one master switch for the whole overlay layer.
+- **Textures** - whole-pack Presets (one click, including packs you add yourself),
+  independent per-category Advanced swaps (Tools, Utilities, Armor, GUI, Fonts), and
+  savable Custom Preset + Advanced combos.
 
 See [NOTICE.md](NOTICE.md) for exactly which bundled/adapted third-party content backs
 which feature, and its license.
-
----
-
-## Installation
-
-1. Install [Fabric Loader](https://fabricmc.net/use/) 0.19.3+ for Minecraft **1.21.11
-   exactly** - the version is pinned, not a range, so other 1.21.x releases aren't
-   guaranteed compatible.
-2. Download [Fabric API](https://modrinth.com/mod/fabric-api) 0.141.4+1.21.11 (or newer)
-   and Solstice, both for 1.21.11.
-3. Drop both `.jar` files into your instance's `mods` folder.
-4. Launch the game, then press **Right Shift** in-game to open Solstice's settings and
-   turn on whatever you actually want - most features are off by default so nothing
-   changes until you ask for it.
-
-That's it - no separate config file to edit, no other dependencies to track down. Java
-21+ is required (bundled with recent Minecraft launchers, so most people already have it).
 
 ---
 
@@ -105,29 +69,6 @@ Solstice is a **pure optimization + QOL client**. It never modifies:
 
 All changes are graphical, informational, or transport-layer only, and are safe on any
 server.
-
----
-
-## Building from source
-
-Most users just want the [Installation](#installation) steps above - this is only for
-building the jar yourself.
-
-```bash
-git clone https://github.com/soul-lyte/Solstice.git
-cd Solstice
-gradle build
-```
-
-The compiled JAR lands in `build/libs/`.
-
-| Dependency | Version |
-|---|---|
-| Java | 21+ |
-| Minecraft | 1.21.11 |
-| Fabric Loader | 0.19.3+ |
-| Fabric API | 0.141.4+1.21.11 |
-| Fabric Loom | 1.16.x |
 
 ---
 
