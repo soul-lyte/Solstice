@@ -46,7 +46,6 @@
     "viewdistance.ChunkLightProviderMixin",
     "viewdistance.WorldChunkMixin",
     "viewdistance.GameOptionsMixin",
-    "viewdistance.IntegratedServerMixin",
     "viewdistance.ClientPlayNetworkHandlerMixin",
     "viewdistance.ClientSettingsC2SPacketMixin",
     "viewdistance.ClientWorldAccessor",

@@ -6,6 +6,7 @@ import com.example.solstice.ui.widget.SolsticeButton;
 import com.example.solstice.ui.widget.SolsticeChoiceRow;
 import com.example.solstice.ui.widget.SolsticeSliderWidget;
 import com.example.solstice.ui.widget.SolsticeToggleRow;
+import com.example.solstice.viewdistance.ViewDistanceModule;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.CloudRenderMode;
 import net.minecraft.client.option.GameOptions;
@@ -95,7 +96,16 @@ public class SolsticeVideoSettingsScreen extends Screen {
         int y = HEADER_H + TAB_H + ROW_GAP;
 
         if (activeTab == 0) {
-            y = addIntRow(options.getViewDistance(), "Render Distance", "How many chunks of terrain load around you. Higher looks further but costs more FPS. With Chunk Retention (Solstice, Advanced tab) enabled, raising this also controls how far already-explored terrain stays visible.", 2, 64, SIDE_PAD, y, contentW);
+            String renderDistanceDesc = ViewDistanceModule.getInstance().isEnabled()
+                    ? "How many chunks of real terrain load around you, in every direction, whether explored before or not. Higher looks further but costs more FPS - and means more real chunk generation, especially into new terrain. See Retention Distance below for extra range that's free wherever you've already been."
+                    : "How many chunks of terrain load around you. Higher looks further but costs more FPS.";
+            y = addIntRow(options.getViewDistance(), "Render Distance", renderDistanceDesc, 2, 64, SIDE_PAD, y, contentW);
+            if (ViewDistanceModule.getInstance().isEnabled()) {
+                y = addIntRow(ViewDistanceModule.getInstance().getRetentionDistance(), "Retention Distance (Solstice)",
+                        "Extra rings added ON TOP of Render Distance, filled with cached terrain wherever you've already explored - free, no real chunk generation needed. Has no effect in a direction you've never visited (nothing cached there yet). Render Distance + Retention Distance = the total distance already-explored terrain can reach; unexplored terrain always stops at Render Distance alone.",
+                        0, 64, SIDE_PAD, y, contentW,
+                        ViewDistanceModule.getInstance()::setRetentionDistance);
+            }
             y = addIntRow(options.getSimulationDistance(), "Simulation Distance", "How far from you the game actually simulates things like crops growing or redstone - always at least as small as render distance.", 5, 32, SIDE_PAD, y, contentW);
             y = addDoubleRow(options.getEntityDistanceScaling(), "Entity Distance", "How far away entities (mobs, players, item drops) stay visible, as a percentage.", 0.5, 5.0, SIDE_PAD, y, contentW);
             y = addMaxFpsRow(options.getMaxFps(), SIDE_PAD, y, contentW);

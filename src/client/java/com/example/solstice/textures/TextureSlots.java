@@ -24,17 +24,15 @@ public final class TextureSlots {
      * The single Tools slot - deliberately just one unified choice, not a
      * per-tool-type breakdown (there used to also be a separate Sword-only
      * slot; removed per direct request in favor of one "All Tools" control).
-     * "Mini Sword" only reskins the sword, unlike the other three options
-     * which retexture the whole tool/weapon set - kept as an option here
-     * rather than dropped, since it was already a real, working feature.
+     * "Mini Sword" (a sword-only reskin) used to be bundled here too - removed
+     * per direct request, it came from a pack with no redistribution license.
      */
     public static final TextureSlot TOOLS_ALL = new TextureSlot("tools_all", "All Tools",
             "Swaps every tool/weapon texture at once, sourced from a real resource pack. "
                     + "Vanilla+/Tournament/Tiny Tools/etc. show up here automatically if you have "
                     + "them installed - see DynamicTextureRegistry.",
             List.of(
-                    new TextureOption("vanilla", "Vanilla", null),
-                    new TextureOption("mini", "Mini Sword", "tools_mini_sword")
+                    new TextureOption("vanilla", "Vanilla", null)
             ),
             "textures/item/diamond_sword.png");
 

@@ -83,11 +83,11 @@ which files this applies to.
 
 ## Removed: previously-bundled resource packs with no redistribution license
 
-Four texture packs (Tiny Tools by jahirtrap, Vanilla+ by Marlowww, Tournament
+Five texture packs (Tiny Tools by jahirtrap, Vanilla+ by Marlowww, Tournament
 [16x] - credited per its own `credits.txt` to Saki 16x/Keno, Cuboids/Cryokine,
 Fabled/Belmu, Alius, Skeletony, Kemiu, ovaszos_uborka, WeNAN Studios, and
-Clyred for different pieces - and SMP Essentials by MrOrdenador) used to be
-bundled directly inside the jar as Presets and Advanced-row options. None of
+Clyred for different pieces - SMP Essentials by MrOrdenador, and Mini Sword)
+used to be bundled directly inside the jar as Presets and Advanced-row options. None of
 them ever came with a license file, so redistributing them was never actually
 cleared. Removed entirely on this branch rather than left flagged: Solstice no
 longer bundles or redistributes any third-party texture pack. If you have one

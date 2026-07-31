@@ -77,20 +77,6 @@ function Copy-AssetsSubtree($sourceAssets, $destAssets, $onlyNamespace) {
     }
 }
 
-Write-Host "=== tools_mini_sword ==="
-$dest = New-Pack "tools_mini_sword"
-Copy-AssetsSubtree (Join-Path $refTextures "Tools\Sword\Mini Sword\assets") (Join-Path $dest "assets") $null
-# The source pack's iron_sword.png/netherite_sword.png are a 12x12 canvas while
-# every other sword in it is 16x16 - Minecraft's generated-item-model geometry is
-# built from the texture's own pixel grid, so that mismatch is what made those two
-# render "giant" next to the properly-mini others. Fixed here (on the bundled COPY,
-# never on the original References/ file) rather than by hand, so it survives a
-# re-run of this script if the reference pack gets updated again.
-$itemTexDir = Join-Path $dest "assets\minecraft\textures\item"
-Pad-TextureCanvas (Join-Path $itemTexDir "iron_sword.png") 16
-Pad-TextureCanvas (Join-Path $itemTexDir "netherite_sword.png") 16
-Write-PackMcmeta $dest "Solstice - Mini Sword tool skin"
-
 Write-Host "=== gui_dark ==="
 $dest = New-Pack "gui_dark"
 Copy-AssetsSubtree (Join-Path $refTextures "GUI\GUI - Dark\Default-Dark-Mode-1.21.11-2026.4.0\assets") (Join-Path $dest "assets") "minecraft"

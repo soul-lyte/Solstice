@@ -92,8 +92,12 @@ public final class DynamicTextureRegistry {
 
         for (ResourcePackProfile profile : candidates) {
             String id = profile.getId();
-            if (id.startsWith(SolsticeMod.MOD_ID + ":") || id.startsWith("file/" + DYNAMIC_PACK_PREFIX)) {
-                continue; // never offer Solstice's own bundled/synthetic packs as a "detected" source
+            if (id.equals("vanilla") || id.startsWith(SolsticeMod.MOD_ID + ":") || id.startsWith("file/" + DYNAMIC_PACK_PREFIX)) {
+                // "vanilla" is itself a real ResourcePackProfile (vanilla's own built-in
+                // assets, usually displayed as "Default") - it trivially has every
+                // signature file by definition, which without this exclusion showed up
+                // as a duplicate "Default" option alongside the base slot's own "Vanilla".
+                continue;
             }
             if (!PackContentScanner.scan(profile).contains(category)) {
                 continue;
