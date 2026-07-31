@@ -29,14 +29,12 @@ public final class TextureSlots {
      * rather than dropped, since it was already a real, working feature.
      */
     public static final TextureSlot TOOLS_ALL = new TextureSlot("tools_all", "All Tools",
-            "Swaps every tool/weapon texture at once, sourced from a real resource pack.",
+            "Swaps every tool/weapon texture at once, sourced from a real resource pack. "
+                    + "Vanilla+/Tournament/Tiny Tools/etc. show up here automatically if you have "
+                    + "them installed - see DynamicTextureRegistry.",
             List.of(
                     new TextureOption("vanilla", "Vanilla", null),
-                    new TextureOption("mini", "Mini Sword", "tools_mini_sword"),
-                    new TextureOption("tiny_tools", "Tiny Tools", "tools_tiny_tools"),
-                    new TextureOption("vanillaplus", "Vanilla+", "tools_vanillaplus"),
-                    new TextureOption("tournament", "Tournament", "tools_tournament"),
-                    new TextureOption("kb1_sword", "KB1 Sword", "tools_kb1_sword")
+                    new TextureOption("mini", "Mini Sword", "tools_mini_sword")
             ),
             "textures/item/diamond_sword.png");
 
@@ -48,9 +46,7 @@ public final class TextureSlots {
     public static final TextureSlot UTILITIES_ALL = new TextureSlot("utilities_all", "Utility Items",
             "Swaps misc item textures (food, cobwebs, etc.) at once, sourced from a real resource pack.",
             List.of(
-                    new TextureOption("vanilla", "Vanilla", null),
-                    new TextureOption("vanillaplus", "Vanilla+", "utilities_vanillaplus"),
-                    new TextureOption("tournament", "Tournament", "utilities_tournament")
+                    new TextureOption("vanilla", "Vanilla", null)
             ),
             "textures/item/golden_apple.png");
 
@@ -58,9 +54,7 @@ public final class TextureSlots {
     public static final TextureSlot ARMOR_ALL = new TextureSlot("armor_all", "Armor",
             "Swaps worn armor textures, sourced from a real resource pack.",
             List.of(
-                    new TextureOption("vanilla", "Vanilla", null),
-                    new TextureOption("vanillaplus", "Vanilla+", "armor_vanillaplus"),
-                    new TextureOption("tournament", "Tournament", "armor_tournament")
+                    new TextureOption("vanilla", "Vanilla", null)
             ),
             // The worn-armor equipment texture is a full UV skin sheet (all
             // pieces laid out in one image), not a clean icon - previewing it

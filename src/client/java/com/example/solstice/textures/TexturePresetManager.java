@@ -33,30 +33,21 @@ public final class TexturePresetManager {
     private static final String SAVED_COUNT_KEY = "textures.preset.saved.count";
 
     public static final TexturePreset VANILLA = new TexturePreset("vanilla", "Vanilla", null, null);
-    public static final TexturePreset TINY_TOOLS = new TexturePreset("tiny_tools", "Tiny Tools", "solstice:preset_tiny_tools", "by jahirtrap");
-    public static final TexturePreset VANILLA_PLUS = new TexturePreset("vanillaplus", "Vanilla+", "solstice:preset_vanillaplus", "by Marlowww");
-    public static final TexturePreset TOURNAMENT = new TexturePreset("tournament", "Tournament", "solstice:preset_tournament",
-            "By Fear, ported by @uthaspacks\n"
-                    + "Bow: Saki 16x - Keno\n"
-                    + "Fireball: Cuboids - Cryokine\n"
-                    + "Pearl/Eye/Charcoal: Fabled - Belmu\n"
-                    + "Buckets/boots/leggings: Alius\n"
-                    + "Powders/nametag: Skeletony\n"
-                    + "Base blocks: Keno's Fault\n"
-                    + "Warped blocks: Kemiu\n"
-                    + "Blackstone & Quartz: ovaszos_uborka\n"
-                    + "Cactus: WeNAN Studios\n"
-                    + "Models: Clyred\n"
-                    + "Diamond Palette: Dino_nuggies");
-    public static final TexturePreset SMP_ESSENTIALS = new TexturePreset("smpessentials", "SMP Essentials", "solstice:preset_smpessentials", "by MrOrdenador");
 
-    public static final List<TexturePreset> BUILTIN = List.of(VANILLA, TINY_TOOLS, VANILLA_PLUS, TOURNAMENT, SMP_ESSENTIALS);
+    // Tiny Tools/Vanilla+/Tournament/SMP Essentials used to be bundled here as
+    // whole-pack presets, but none of them ever came with a redistribution
+    // license - see NOTICE.md. Removed on this branch in favor of dynamic
+    // detection (DynamicTextureRegistry): if the user has one of those packs
+    // installed themselves, its content now shows up automatically in the
+    // Advanced row instead of Solstice ever shipping the pack itself.
+    public static final List<TexturePreset> BUILTIN = List.of(VANILLA);
 
     /** One saved combo: which Preset (by id) plus the Advanced row's three category slot indices. */
     public record SavedCombo(int index, String name, String presetId, int toolsIndex, int utilitiesIndex, int armorIndex) {}
 
     private final List<TexturePreset> addedPacks = new ArrayList<>();
     private final List<SavedCombo> savedCombos = new ArrayList<>();
+    private String lastError;
 
     private TexturePresetManager() {
         ConfigManager cfg = ConfigManager.getInstance();
@@ -96,6 +87,9 @@ public final class TexturePresetManager {
         return savedCombos;
     }
 
+    /** Set whenever {@link #select} or {@link #addPackFromDisk} fails - cleared at the start of each call. */
+    public String getLastError() { return lastError; }
+
     public String getSelectedId() {
         return ConfigManager.getInstance().getString(SELECTED_KEY, VANILLA.id());
     }
@@ -129,6 +123,7 @@ public final class TexturePresetManager {
 
     /** Enables the given preset's pack (if any) and disables every other known preset pack, then reloads once. */
     public void select(TexturePreset preset) {
+        lastError = null;
         ResourcePackManager manager = MinecraftClient.getInstance().getResourcePackManager();
         for (TexturePreset other : getAllPresets()) {
             if (!other.isVanilla() && !other.packId().equals(preset.packId())) {
@@ -136,7 +131,14 @@ public final class TexturePresetManager {
             }
         }
         if (!preset.isVanilla()) {
-            manager.enable(preset.packId());
+            // enable() silently returns false (no exception, no log) if scanPacks() never
+            // produced a matching profile - previously discarded entirely, which is why a
+            // pack that failed to register looked exactly like a successful, working
+            // selection. Surface it instead of pretending it worked.
+            if (!manager.hasProfile(preset.packId()) || !manager.enable(preset.packId())) {
+                lastError = "\"" + preset.displayName() + "\" couldn't be enabled - the pack wasn't found on disk.";
+                SolsticeMod.LOGGER.warn("[Solstice] {} (profile id: {})", lastError, preset.packId());
+            }
         }
         ConfigManager.getInstance().set(SELECTED_KEY, preset.id());
         MinecraftClient.getInstance().reloadResources();
@@ -154,6 +156,7 @@ public final class TexturePresetManager {
      * @return the newly added preset, or null if the copy failed
      */
     public TexturePreset addPackFromDisk(Path source) {
+        lastError = null;
         MinecraftClient client = MinecraftClient.getInstance();
         Path targetDir = client.getResourcePackDir();
         String fileName = source.getFileName().toString();
@@ -162,18 +165,28 @@ public final class TexturePresetManager {
         try {
             if (Files.isDirectory(source)) {
                 copyDirectory(source, target);
+                flattenWrapperFolder(target);
             } else {
                 Files.createDirectories(targetDir);
                 Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
+            lastError = "Couldn't copy that pack: " + e.getMessage();
             SolsticeMod.LOGGER.warn("[Solstice] Couldn't copy resource pack {} into {}: {}", source, targetDir, e.getMessage());
             return null;
         }
 
-        client.getResourcePackManager().scanPacks();
+        ResourcePackManager manager = client.getResourcePackManager();
+        manager.scanPacks();
 
         String profileId = "file/" + fileName;
+        if (!manager.hasProfile(profileId)) {
+            lastError = "Couldn't find a pack.mcmeta in \"" + fileName + "\" - make sure you picked the folder that "
+                    + "directly contains pack.mcmeta, not a parent folder.";
+            SolsticeMod.LOGGER.warn("[Solstice] {} (expected profile id: {})", lastError, profileId);
+            return null;
+        }
+
         String displayName = stripPackExtension(fileName);
         int index = addedPacks.size();
         addedPacks.add(new TexturePreset("added_" + index, displayName, profileId, null));
@@ -184,6 +197,36 @@ public final class TexturePresetManager {
         cfg.set(ADDED_COUNT_KEY, addedPacks.size());
 
         return addedPacks.get(index);
+    }
+
+    /**
+     * Common real-world case: a zip that unpacks to a single wrapper folder
+     * (e.g. {@code MyPack-1.21/MyPack-1.21/pack.mcmeta}) rather than
+     * {@code pack.mcmeta} sitting directly at the top level. Vanilla's own
+     * {@code FileResourcePackProvider} only scans direct children of the real
+     * resourcepacks directory, so a nested pack.mcmeta one level too deep
+     * would never register at all - if the copied folder has no pack.mcmeta
+     * of its own but contains exactly one subdirectory that does, flatten
+     * that subdirectory's contents up a level.
+     */
+    private static void flattenWrapperFolder(Path target) throws IOException {
+        if (Files.exists(target.resolve("pack.mcmeta"))) return;
+
+        List<Path> subdirs;
+        try (var stream = Files.list(target)) {
+            subdirs = stream.filter(Files::isDirectory).toList();
+        }
+        if (subdirs.size() != 1) return;
+
+        Path wrapper = subdirs.get(0);
+        if (!Files.exists(wrapper.resolve("pack.mcmeta"))) return;
+
+        try (var stream = Files.list(wrapper)) {
+            for (Path child : stream.toList()) {
+                Files.move(child, target.resolve(child.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        Files.delete(wrapper);
     }
 
     private static String stripPackExtension(String fileName) {
@@ -241,9 +284,10 @@ public final class TexturePresetManager {
         ConfigManager.getInstance().set(SELECTED_KEY, preset.id());
 
         TexturePackManager packs = TexturePackManager.getInstance();
-        packs.applyIndex(TextureSlots.TOOLS_ALL, combo.toolsIndex());
-        packs.applyIndex(TextureSlots.UTILITIES_ALL, combo.utilitiesIndex());
-        packs.applyIndex(TextureSlots.ARMOR_ALL, combo.armorIndex());
+        DynamicTextureRegistry registry = DynamicTextureRegistry.getInstance();
+        packs.applyIndex(registry.mergeSlots(List.of(TextureSlots.TOOLS_ALL)).get(0), combo.toolsIndex());
+        packs.applyIndex(registry.mergeSlots(List.of(TextureSlots.UTILITIES_ALL)).get(0), combo.utilitiesIndex());
+        packs.applyIndex(registry.mergeSlots(List.of(TextureSlots.ARMOR_ALL)).get(0), combo.armorIndex());
 
         MinecraftClient.getInstance().reloadResources();
     }

@@ -71,6 +71,7 @@ public final class TextureSlot {
     public List<TextureOption> getOptions() { return options; }
     public String getPreviewAssetPath() { return previewAssetPath; }
     public int getDefaultIndex() { return defaultIndex; }
+    public PreviewRenderer getFallbackRenderer() { return fallbackRenderer; }
 
     /** Only used when {@link #getPreviewAssetPath()} is null. */
     public void renderFallback(DrawContext context, int x, int y, int size) {

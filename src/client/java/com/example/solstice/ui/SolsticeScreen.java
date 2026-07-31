@@ -137,6 +137,8 @@ public class SolsticeScreen extends Screen {
     private int texturesViewportTop;
     private int texturesScrollOffset;
     private int texturesMaxScroll;
+    /** Set after a failed "Add your own"/preset selection - cleared on the next successful one. */
+    private String textureStatusMessage;
 
     public SolsticeScreen(Screen parent) {
         super(Text.literal("Solstice"));
@@ -429,6 +431,7 @@ public class SolsticeScreen extends Screen {
                 TexturePresetCardWidget card = new TexturePresetCardWidget(cx, screenY, cardW, preset, textRenderer,
                         isSelected, () -> {
                             presets.select(preset);
+                            textureStatusMessage = presets.getLastError();
                             rebuildCards();
                         });
                 cards.add(card);
@@ -476,7 +479,15 @@ public class SolsticeScreen extends Screen {
             addDrawableChild(saveBtn);
         }));
 
-        return saveBtnY + 16;
+        int bottom = saveBtnY + 16;
+        if (textureStatusMessage != null) {
+            int msgY = bottom + 4;
+            items.add(new TexturesItem(msgY, 10, screenY ->
+                    profileRowLabels.add(new ProfileRowLabel(textureStatusMessage, SIDE_PAD, screenY))));
+            bottom = msgY + 10;
+        }
+
+        return bottom;
     }
 
     private int layoutAdvancedRow(List<TexturesItem> items, int labelY, int cardW) {
@@ -506,7 +517,9 @@ public class SolsticeScreen extends Screen {
                 TextureCategoryCardWidget card = new TextureCategoryCardWidget(cx, screenY, cardW,
                         cat.name(), cat.description(), textRenderer, () -> {
                             assert client != null;
-                            client.setScreen(new TextureCategoryScreen(this, cat.name(), cat.slots()));
+                            List<com.example.solstice.textures.TextureSlot> merged =
+                                    com.example.solstice.textures.DynamicTextureRegistry.getInstance().mergeSlots(cat.slots());
+                            client.setScreen(new TextureCategoryScreen(this, cat.name(), merged));
                         });
                 cards.add(card);
                 addDrawableChild(card);
@@ -518,19 +531,22 @@ public class SolsticeScreen extends Screen {
 
     private void openAddPackPicker() {
         ResourcePackFileChooser.pick(path -> {
-            TexturePreset added = TexturePresetManager.getInstance().addPackFromDisk(path);
+            TexturePresetManager presets = TexturePresetManager.getInstance();
+            TexturePreset added = presets.addPackFromDisk(path);
             if (added != null) {
-                TexturePresetManager.getInstance().select(added);
+                presets.select(added);
             }
+            textureStatusMessage = presets.getLastError();
             rebuildCards();
         });
     }
 
     private void saveCurrentPreset() {
         TexturePackManager packs = TexturePackManager.getInstance();
-        int toolsIndex = packs.getSelectedIndex(TextureSlots.TOOLS_ALL);
-        int utilitiesIndex = packs.getSelectedIndex(TextureSlots.UTILITIES_ALL);
-        int armorIndex = packs.getSelectedIndex(TextureSlots.ARMOR_ALL);
+        com.example.solstice.textures.DynamicTextureRegistry registry = com.example.solstice.textures.DynamicTextureRegistry.getInstance();
+        int toolsIndex = packs.getSelectedIndex(registry.mergeSlots(List.of(TextureSlots.TOOLS_ALL)).get(0));
+        int utilitiesIndex = packs.getSelectedIndex(registry.mergeSlots(List.of(TextureSlots.UTILITIES_ALL)).get(0));
+        int armorIndex = packs.getSelectedIndex(registry.mergeSlots(List.of(TextureSlots.ARMOR_ALL)).get(0));
         TexturePresetManager.getInstance().saveCombo(toolsIndex, utilitiesIndex, armorIndex);
         rebuildCards();
     }

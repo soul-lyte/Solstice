@@ -4,8 +4,14 @@ import com.example.solstice.SolsticeMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.resource.InputSupplier;
+import net.minecraft.resource.ResourcePack;
+import net.minecraft.resource.ResourcePackManager;
+import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.resource.ResourceType;
 import net.minecraft.util.Identifier;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -65,6 +71,12 @@ public final class TexturePreviewLoader {
         if (option.isVanilla()) {
             return TexturePreviewLoader.class.getResourceAsStream("/assets/minecraft/" + assetPath);
         }
+
+        DynamicTextureRegistry.DynamicSource source = DynamicTextureRegistry.getInstance().lookup(option.packId());
+        if (source != null) {
+            return openDynamicStream(source, assetPath);
+        }
+
         // A pack-root "preview.png" (a purpose-made preview graphic, distinct from
         // the actual in-game asset) wins over the shared slot asset path if present.
         InputStream dedicated = TexturePreviewLoader.class.getResourceAsStream(
@@ -72,6 +84,32 @@ public final class TexturePreviewLoader {
         if (dedicated != null) return dedicated;
         return TexturePreviewLoader.class.getResourceAsStream(
                 "/resourcepacks/" + option.packId() + "/assets/minecraft/" + assetPath);
+    }
+
+    /**
+     * Reads a preview straight from a dynamically-detected pack's real source
+     * (on disk, not Solstice's own jar). The bytes are copied out before the
+     * {@link ResourcePack} handle closes, since a zip-backed pack's stream
+     * isn't guaranteed to stay valid past that point.
+     */
+    private InputStream openDynamicStream(DynamicTextureRegistry.DynamicSource source, String assetPath) {
+        ResourcePackManager manager = MinecraftClient.getInstance().getResourcePackManager();
+        ResourcePackProfile profile = manager.getProfile(source.sourceProfileId());
+        if (profile == null) return null;
+
+        try (ResourcePack pack = profile.createResourcePack()) {
+            if (pack == null) return null;
+            InputSupplier<InputStream> supplier = pack.open(ResourceType.CLIENT_RESOURCES, Identifier.of("minecraft", assetPath));
+            if (supplier == null) return null;
+            try (InputStream in = supplier.get()) {
+                if (in == null) return null;
+                return new ByteArrayInputStream(in.readAllBytes());
+            }
+        } catch (IOException e) {
+            SolsticeMod.LOGGER.warn("[Solstice] Couldn't load dynamic preview from {} ({}): {}",
+                    source.sourceProfileId(), assetPath, e.getMessage());
+            return null;
+        }
     }
 
     private static String sanitize(String key) {
