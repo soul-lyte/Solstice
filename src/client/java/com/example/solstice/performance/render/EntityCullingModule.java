@@ -8,6 +8,7 @@ import com.example.solstice.core.util.TimeUtil;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
@@ -102,7 +103,10 @@ public final class EntityCullingModule extends AbstractModule {
      */
     public boolean shouldRender(Entity entity, MinecraftClient client) {
         if (!isEnabled() || client.player == null) return true;
-        if (entity == client.player) return true;
+        // Never cull players - a culled-out player behind a wall corner or at range is a real
+        // PvP/SMP awareness problem (missing a nearby player is a much worse outcome than the
+        // small GPU cost of always drawing them), not just a visual nicety like it is for mobs.
+        if (entity instanceof PlayerEntity) return true;
 
         double distSq = client.player.squaredDistanceTo(entity);
         double maxDistSq = (double) maxRenderDistanceBlocks * maxRenderDistanceBlocks;

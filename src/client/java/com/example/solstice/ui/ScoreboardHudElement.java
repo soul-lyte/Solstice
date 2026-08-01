@@ -17,6 +17,24 @@ import net.minecraft.client.gui.DrawContext;
  * example (title + a few name/score rows, styled like vanilla's real
  * sidebar) rather than a plain placeholder, so positioning it doesn't
  * require actually being on a server with a live scoreboard objective.
+ *
+ * <p><b>Real bug, fixed</b>: {@code getDefaultX}/{@code getDefaultY} used to
+ * be a static formula guess, but vanilla's actual anchor position depends on
+ * the real scoreboard's own content width (varies with the longest name/
+ * score on screen) - a value only knowable from an actual live render, not
+ * derivable from a formula. Since the editor showed the box at the guessed
+ * position while the real Mixin computed its delta against the true,
+ * content-dependent position, dragging the box to a spot in the editor and
+ * the real scoreboard ending up somewhere else entirely were two different,
+ * inconsistent baselines - "correct" in isolation, but never agreeing with
+ * each other. Fixed by having {@code InGameHudScoreboardMixin} cache the
+ * real natural position/width it computes on every actual render via {@link
+ * #recordRealNaturalBounds}, and using that here whenever it's available -
+ * matching the exact same baseline the real Mixin uses, so a drag in the
+ * editor now lands the real scoreboard in the same spot. Falls back to the
+ * old static guess only if no real scoreboard has rendered yet this
+ * session (e.g. the editor opened before ever joining a world with an
+ * active objective).</p>
  */
 public final class ScoreboardHudElement implements HudElement {
 
@@ -30,23 +48,36 @@ public final class ScoreboardHudElement implements HudElement {
     private static final int LINE_H = 9;
     private static final int WIDTH = 120;
 
+    private static boolean hasRealBounds;
+    private static int realNaturalX, realNaturalY, realNaturalW;
+
     private ScoreboardHudElement() {}
 
     public static ScoreboardHudElement getInstance() { return INSTANCE; }
 
+    /** Called by {@code InGameHudScoreboardMixin} every time the real scoreboard actually renders. */
+    public static void recordRealNaturalBounds(int naturalX, int naturalY, int naturalW) {
+        hasRealBounds = true;
+        realNaturalX = naturalX;
+        realNaturalY = naturalY;
+        realNaturalW = naturalW;
+    }
+
     @Override public String getId()          { return "scoreboard"; }
     @Override public String getDisplayName() { return "Scoreboard"; }
-    @Override public int getWidth()          { return WIDTH; }
+    @Override public int getWidth()          { return hasRealBounds ? realNaturalW : WIDTH; }
     @Override public int getHeight()         { return HEADER_H + EXAMPLE_NAMES.length * LINE_H + 4; }
 
     @Override
     public int getDefaultX(int screenWidth, int screenHeight) {
+        if (hasRealBounds) return realNaturalX;
         // Vanilla anchors the real sidebar to the right edge of the screen.
         return screenWidth - WIDTH - 3;
     }
 
     @Override
     public int getDefaultY(int screenWidth, int screenHeight) {
+        if (hasRealBounds) return realNaturalY;
         // Vanilla anchors the panel's bottom edge to screenHeight/2 + rowCount*3, growing upward
         // by rowCount*9 for the entry rows plus a 10px header - confirmed via decompiling
         // InGameHud.renderScoreboardSidebar - so the real top-of-header y is

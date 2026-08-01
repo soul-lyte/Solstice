@@ -66,6 +66,11 @@ public abstract class InGameHudScoreboardMixin {
         int naturalY = y1 + 10;
         int naturalW = x2 - x1;
 
+        // So the HUD editor's draggable box can use the same real, content-dependent
+        // baseline this Mixin computes its own delta from - see ScoreboardHudElement's
+        // own Javadoc for the bug this fixes.
+        com.example.solstice.ui.ScoreboardHudElement.recordRealNaturalBounds(naturalX, naturalY, naturalW);
+
         int storedX = HudLayoutManager.getInstance().getX("scoreboard", naturalX);
         int storedY = HudLayoutManager.getInstance().getY("scoreboard", naturalY);
         int storedW = HudLayoutManager.getInstance().getWidth("scoreboard", naturalW);
