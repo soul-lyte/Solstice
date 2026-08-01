@@ -30,6 +30,7 @@ import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -530,15 +531,34 @@ public class SolsticeScreen extends Screen {
     }
 
     private void openAddPackPicker() {
-        ResourcePackFileChooser.pick(path -> {
-            TexturePresetManager presets = TexturePresetManager.getInstance();
-            TexturePreset added = presets.addPackFromDisk(path);
-            if (added != null) {
-                presets.select(added);
-            }
-            textureStatusMessage = presets.getLastError();
-            rebuildCards();
-        });
+        ResourcePackFileChooser.pick(this::addAndSelectPack);
+    }
+
+    private void addAndSelectPack(Path path) {
+        TexturePresetManager presets = TexturePresetManager.getInstance();
+        TexturePreset added = presets.addPackFromDisk(path);
+        if (added != null) {
+            presets.select(added);
+        }
+        textureStatusMessage = presets.getLastError();
+        rebuildCards();
+    }
+
+    /**
+     * Real vanilla hook (confirmed via decompile - the same mechanism vanilla's own
+     * Resource Packs screen uses for drag-and-drop) - fires whenever files are dropped
+     * onto the game window while this screen is open, regardless of which widget (if
+     * any) is under the cursor. Only acts while the Textures tab is active, so dropping
+     * a file while browsing Profiles/Quality of Life doesn't do anything surprising.
+     */
+    @Override
+    public void onFilesDropped(List<Path> paths) {
+        if (activeCategory != ModuleCategory.TEXTURES || paths.isEmpty()) {
+            return;
+        }
+        for (Path path : paths) {
+            addAndSelectPack(path);
+        }
     }
 
     private void saveCurrentPreset() {

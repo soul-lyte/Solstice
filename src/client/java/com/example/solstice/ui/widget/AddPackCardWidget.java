@@ -34,11 +34,16 @@ public class AddPackCardWidget extends SolsticeClickableWidget {
 
         String plus = "+";
         int plusW = textRenderer.getWidth(plus);
-        context.drawText(textRenderer, plus, getX() + (getWidth() - plusW) / 2, getY() + 10, ColorPalette.TEXT_ACCENT, false);
+        context.drawText(textRenderer, plus, getX() + (getWidth() - plusW) / 2, getY() + 2, ColorPalette.TEXT_ACCENT, false);
 
         String label = getMessage().getString();
         int labelW = textRenderer.getWidth(label);
-        context.drawText(textRenderer, label, getX() + (getWidth() - labelW) / 2, getY() + getHeight() - 20,
+        context.drawText(textRenderer, label, getX() + (getWidth() - labelW) / 2, getY() + 14,
+                ColorPalette.TEXT_SECONDARY, false);
+
+        String hint = "or drop it here";
+        int hintW = textRenderer.getWidth(hint);
+        context.drawText(textRenderer, hint, getX() + (getWidth() - hintW) / 2, getY() + 26,
                 ColorPalette.TEXT_SECONDARY, false);
     }
 
