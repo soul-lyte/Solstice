@@ -3,45 +3,54 @@ package com.example.solstice.textures;
 import com.example.solstice.SolsticeMod;
 import net.minecraft.client.MinecraftClient;
 
-import javax.swing.JFileChooser;
-import javax.swing.JFrame;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Native OS file/folder picker for the "Add your own" Presets card - a
- * resource pack is either a {@code .zip} file or an extracted folder, so
- * this allows picking either in one dialog. Runs the picker on its own
- * thread (Swing's own event loop, kept off Minecraft's render thread) and
- * marshals the result back onto the client thread via {@link
- * MinecraftClient#execute}, since only that thread should touch game state.
+ * Native OS file picker for the "Add your own" Presets card - a real Windows
+ * file-open dialog, not a Java Swing one.
  *
- * <p>The dialog is parented to a throwaway, invisible, always-on-top
- * {@link JFrame} rather than {@code null} - real bug found and fixed: with a
- * {@code null} parent the chooser opened behind Minecraft's own window with
- * no way to bring it forward, so clicking "Add your own" looked like it
- * silently did nothing. That alone isn't enough on a real exclusive-fullscreen
- * window though - Windows gives an exclusive-fullscreen app special
- * always-frontmost compositor treatment that an ordinary "always on top" AWT
- * window can't override, so the dialog could still open completely hidden
- * behind the game (this project already hit the same class of bug earlier
- * this session, for GUI window automation, and worked around it the same
- * way: drop out of exclusive fullscreen first). This now temporarily toggles
- * the game out of fullscreen (if it's on) before showing the dialog and back
- * on afterward - windowed/borderless users are unaffected either way.</p>
+ * <p><b>Real history, why this isn't a Swing {@code JFileChooser} anymore</b>:
+ * it was, twice - first with a real, fixed bug (the dialog opening hidden
+ * behind an exclusive-fullscreen window), then with a second real, fixed bug
+ * ({@code new JFrame()} sitting outside the try/catch, silently swallowing
+ * any AWT/Swing init exception). Both fixes were real and correct, but the
+ * button still didn't work afterward - confirmed by the drag-and-drop path
+ * (a completely different, GLFW-native mechanism, see {@code
+ * SolsticeScreen#onFilesDropped}) working fine the whole time. That points at
+ * AWT/Swing itself being unreliable to initialize inside this specific
+ * LWJGL/GLFW-hosted game process, for a reason neither fix could reach since
+ * it's in the JVM's own AWT toolkit bootstrap, not this project's code.
+ * Rather than keep patching the same broken approach, this spawns a real
+ * native Windows file dialog ({@code System.Windows.Forms.OpenFileDialog})
+ * in a completely separate {@code powershell.exe} process - its own clean
+ * environment, no shared AWT state with the game's JVM at all.</p>
  *
- * <p><b>Real bug found and fixed</b>: {@code new JFrame()} used to sit
- * <em>outside</em> the try/catch entirely - if AWT/Swing's toolkit fails to
- * initialize for any reason inside a mostly-LWJGL/GLFW game process (a real
- * possibility, not fully ruled out), that exception would hit this thread's
- * default uncaught-exception handler and vanish with zero trace anywhere -
- * exactly matching "the button does nothing, no visible error." Everything
- * now runs inside the try/catch, plus an explicit {@link
- * Thread#setUncaughtExceptionHandler} as a backstop, plus INFO-level
- * checkpoints at each step so a future report can say exactly which line
- * was reached instead of "nothing happened."</p>
+ * <p><b>Scope note</b>: {@code OpenFileDialog} is a file picker, not a
+ * combined file-or-folder picker the way Swing's {@code JFileChooser} could
+ * be configured - Windows' native dialogs don't have an equivalent unified
+ * mode. Scoped to {@code .zip} files here (the common case for a downloaded
+ * pack); an extracted folder pack is still fully supported via drag-and-drop
+ * onto the Textures tab, which already handles folders correctly.</p>
  */
 public final class ResourcePackFileChooser {
+
+    private static final String SCRIPT = """
+            Add-Type -AssemblyName System.Windows.Forms
+            $dialog = New-Object System.Windows.Forms.OpenFileDialog
+            $dialog.Title = 'Select a Resource Pack (.zip) - or drag a folder pack onto the Textures tab instead'
+            $dialog.Filter = 'Resource Pack (*.zip)|*.zip|All files (*.*)|*.*'
+            $dialog.Multiselect = $false
+            $result = $dialog.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $dialog.FileName
+            }
+            """;
 
     private ResourcePackFileChooser() {}
 
@@ -53,34 +62,34 @@ public final class ResourcePackFileChooser {
         }
 
         Thread thread = new Thread(() -> {
-            SolsticeMod.LOGGER.info("[Solstice] Resource pack picker thread started");
-            JFrame owner = null;
+            SolsticeMod.LOGGER.info("[Solstice] Resource pack picker: launching native dialog process");
             try {
-                owner = new JFrame();
-                SolsticeMod.LOGGER.info("[Solstice] Resource pack picker: JFrame created");
-                owner.setUndecorated(true);
-                owner.setAlwaysOnTop(true);
-                owner.setSize(1, 1);
-                owner.setLocationRelativeTo(null);
-                owner.setVisible(true);
-                owner.toFront();
+                Process process = new ProcessBuilder(
+                        "powershell.exe", "-NoProfile", "-STA", "-WindowStyle", "Hidden", "-Command", SCRIPT)
+                        .redirectErrorStream(true)
+                        .start();
 
-                JFileChooser chooser = new JFileChooser();
-                chooser.setDialogTitle("Select a Resource Pack (folder or .zip)");
-                chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-                SolsticeMod.LOGGER.info("[Solstice] Resource pack picker: about to show dialog");
-                int result = chooser.showOpenDialog(owner);
-                SolsticeMod.LOGGER.info("[Solstice] Resource pack picker: dialog returned, result={}", result);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    Path selected = chooser.getSelectedFile().toPath();
-                    client.execute(() -> onPicked.accept(selected));
+                String output;
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                    output = reader.lines().reduce("", (a, b) -> a.isEmpty() ? b : a + "\n" + b);
                 }
-            } catch (Throwable e) {
+                int exitCode = process.waitFor();
+                SolsticeMod.LOGGER.info("[Solstice] Resource pack picker: process exited with code {}", exitCode);
+
+                String selectedPath = output.strip();
+                if (!selectedPath.isEmpty()) {
+                    Path selected = Path.of(selectedPath);
+                    client.execute(() -> onPicked.accept(selected));
+                } else {
+                    SolsticeMod.LOGGER.info("[Solstice] Resource pack picker: no file selected (cancelled or empty output)");
+                }
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 SolsticeMod.LOGGER.error("[Solstice] Resource pack file picker failed", e);
             } finally {
-                if (owner != null) {
-                    owner.dispose();
-                }
                 if (wasFullscreen) {
                     client.execute(() -> client.getWindow().toggleFullscreen());
                 }
