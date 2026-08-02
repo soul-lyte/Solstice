@@ -457,7 +457,8 @@ public class SolsticeScreen extends Screen {
             int cx = SIDE_PAD + col * (cardW + CARD_GAP);
             int naturalY = rowTop + row * (TexturePresetCardWidget.HEIGHT + CARD_GAP);
             items.add(new TexturesItem(naturalY, TexturePresetCardWidget.HEIGHT, screenY -> {
-                SavedComboCardWidget card = new SavedComboCardWidget(cx, screenY, cardW, combo, textRenderer, false, () -> {
+                boolean isComboSelected = presets.matchesCurrentState(combo);
+                SavedComboCardWidget card = new SavedComboCardWidget(cx, screenY, cardW, combo, textRenderer, isComboSelected, () -> {
                     presets.applyCombo(combo);
                     rebuildCards();
                 });
@@ -564,9 +565,14 @@ public class SolsticeScreen extends Screen {
     private void saveCurrentPreset() {
         TexturePackManager packs = TexturePackManager.getInstance();
         com.example.solstice.textures.DynamicTextureRegistry registry = com.example.solstice.textures.DynamicTextureRegistry.getInstance();
-        int toolsIndex = packs.getSelectedIndex(registry.mergeSlots(List.of(TextureSlots.TOOLS_ALL)).get(0));
-        int utilitiesIndex = packs.getSelectedIndex(registry.mergeSlots(List.of(TextureSlots.UTILITIES_ALL)).get(0));
-        int armorIndex = packs.getSelectedIndex(registry.mergeSlots(List.of(TextureSlots.ARMOR_ALL)).get(0));
+        // Live, not persisted - see TexturePackManager.getLiveSelectedIndex's own Javadoc.
+        // Capturing the persisted value here could save a category's stale choice instead of
+        // what's actually showing (e.g. after switching Presets, which never touches an
+        // independently-set Advanced category's own persisted index), and would also mean the
+        // freshly-saved combo doesn't immediately show as selected via matchesCurrentState.
+        int toolsIndex = packs.getLiveSelectedIndex(registry.mergeSlots(List.of(TextureSlots.TOOLS_ALL)).get(0));
+        int utilitiesIndex = packs.getLiveSelectedIndex(registry.mergeSlots(List.of(TextureSlots.UTILITIES_ALL)).get(0));
+        int armorIndex = packs.getLiveSelectedIndex(registry.mergeSlots(List.of(TextureSlots.ARMOR_ALL)).get(0));
         TexturePresetManager.getInstance().saveCombo(toolsIndex, utilitiesIndex, armorIndex);
         rebuildCards();
     }

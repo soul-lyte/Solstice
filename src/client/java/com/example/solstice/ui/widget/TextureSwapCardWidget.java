@@ -41,7 +41,10 @@ public class TextureSwapCardWidget extends SolsticeClickableWidget {
         super(x, y, width, HEIGHT, Text.of(slot.getDisplayName()));
         this.slot = slot;
         this.textRenderer = textRenderer;
-        this.pendingIndex = TexturePackManager.getInstance().getSelectedIndex(slot);
+        // Live, not persisted - see TexturePackManager.getLiveSelectedIndex's own Javadoc for
+        // why the persisted "textures.<slot>" value can genuinely disagree with what's really
+        // showing (e.g. after switching Presets, which never touches it).
+        this.pendingIndex = TexturePackManager.getInstance().getLiveSelectedIndex(slot);
         setTooltip(Tooltip.of(Text.of(slot.getDescription())));
     }
 
@@ -49,7 +52,7 @@ public class TextureSwapCardWidget extends SolsticeClickableWidget {
     public TextureSlot getSlot() { return slot; }
 
     public boolean hasPendingChange() {
-        return pendingIndex != TexturePackManager.getInstance().getSelectedIndex(slot);
+        return pendingIndex != TexturePackManager.getInstance().getLiveSelectedIndex(slot);
     }
 
     @Override

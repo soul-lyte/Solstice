@@ -299,4 +299,25 @@ public final class TexturePresetManager {
 
         MinecraftClient.getInstance().reloadResources();
     }
+
+    /**
+     * Whether {@code combo} is what's genuinely showing right now - its own
+     * Preset selected, and its three Advanced-row category indices matching
+     * what's really enabled for each (via {@link TexturePackManager#getLiveSelectedIndex},
+     * not a persisted value that can drift - see that method's own Javadoc).
+     * Never derived from a separately-stored "which combo is active" flag,
+     * matching the same real-state-comparison pattern {@code
+     * Profile#matchesCurrentState()} already uses elsewhere in this project
+     * rather than introducing a second, independently-trackable notion of
+     * "selected" that could just as easily go stale on its own.
+     */
+    public boolean matchesCurrentState(SavedCombo combo) {
+        if (!combo.presetId().equals(getSelectedId())) return false;
+
+        TexturePackManager packs = TexturePackManager.getInstance();
+        DynamicTextureRegistry registry = DynamicTextureRegistry.getInstance();
+        return combo.toolsIndex() == packs.getLiveSelectedIndex(registry.mergeSlots(List.of(TextureSlots.TOOLS_ALL)).get(0))
+                && combo.utilitiesIndex() == packs.getLiveSelectedIndex(registry.mergeSlots(List.of(TextureSlots.UTILITIES_ALL)).get(0))
+                && combo.armorIndex() == packs.getLiveSelectedIndex(registry.mergeSlots(List.of(TextureSlots.ARMOR_ALL)).get(0));
+    }
 }

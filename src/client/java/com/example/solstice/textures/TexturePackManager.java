@@ -84,21 +84,79 @@ public final class TexturePackManager {
     }
 
     /**
+     * The option this slot's category is <em>actually</em> showing right
+     * now, determined fresh from the real {@link ResourcePackManager}'s
+     * enabled-pack state instead of trusting the persisted {@code
+     * "textures.&lt;slot&gt;"} config value {@link #getSelectedIndex} reads.
+     *
+     * <p>The two can genuinely disagree - real bug, not hypothetical:
+     * selecting a whole Preset (see {@code TexturePresetManager#select})
+     * only enables/disables Preset packs, it never touches an
+     * independently-set Advanced-row category's own persisted index at
+     * all. So after switching Presets, the Advanced row's card still read
+     * back whatever was last explicitly chosen there even though the
+     * screen was no longer showing it - stale by construction, not just
+     * occasionally out of sync. Deriving live avoids that class of bug
+     * entirely, for this cause and any other future one: whatever pack the
+     * manager actually reports as enabled for one of this slot's own
+     * non-vanilla options wins, full stop. Falls back to the slot's own
+     * vanilla option (or {@link #getSelectedIndex} as a last resort, if a
+     * slot somehow has no vanilla option at all) when none of them are
+     * currently enabled.</p>
+     *
+     * <p>Used for display (so a card never shows a choice that isn't
+     * really active) and by {@link #applyIndex} to know what to actually
+     * disable - see that method's own note.</p>
+     */
+    public int getLiveSelectedIndex(TextureSlot slot) {
+        ResourcePackManager manager = MinecraftClient.getInstance().getResourcePackManager();
+        java.util.Collection<String> enabledIds = manager.getEnabledIds();
+        List<TextureOption> options = slot.getOptions();
+
+        for (int i = 0; i < options.size(); i++) {
+            TextureOption option = options.get(i);
+            if (!option.isVanilla() && enabledIds.contains(resolveProfileId(option))) {
+                return i;
+            }
+        }
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).isVanilla()) return i;
+        }
+        return getSelectedIndex(slot);
+    }
+
+    /** Mirrors {@link #setPackEnabled}'s own packId-to-real-profile-id mapping, just without the side effect. */
+    private String resolveProfileId(TextureOption option) {
+        DynamicTextureRegistry.DynamicSource source = DynamicTextureRegistry.getInstance().lookup(option.packId());
+        if (source != null) {
+            return "file/" + DynamicTextureRegistry.DYNAMIC_PACK_PREFIX + option.packId();
+        }
+        return SolsticeMod.MOD_ID + ":" + option.packId();
+    }
+
+    /**
      * Applies {@code newIndex} for this slot - disables the old pack, enables the new
      * one, persists the choice - but does <em>not</em> reload. Caller is responsible
      * for calling {@link #reload()} once after applying every slot it's changing.
+     *
+     * <p>Disables whatever {@link #getLiveSelectedIndex} says is really
+     * active, not {@link #getSelectedIndex}'s persisted value - so this can
+     * never leave a stale-but-still-enabled dynamic pack behind just
+     * because the persisted index didn't match what was genuinely on
+     * screen (see that method's own Javadoc for a real scenario where the
+     * two disagree).</p>
      */
     public void applyIndex(TextureSlot slot, int newIndex) {
         List<TextureOption> options = slot.getOptions();
         int clamped = ((newIndex % options.size()) + options.size()) % options.size();
-        int oldIndex = getSelectedIndex(slot);
-        if (clamped == oldIndex) return;
+        int oldIndex = getLiveSelectedIndex(slot);
+        if (clamped != oldIndex) {
+            TextureOption oldOption = options.get(oldIndex);
+            TextureOption newOption = options.get(clamped);
 
-        TextureOption oldOption = options.get(oldIndex);
-        TextureOption newOption = options.get(clamped);
-
-        if (!oldOption.isVanilla()) setPackEnabled(oldOption.packId(), false);
-        if (!newOption.isVanilla()) setPackEnabled(newOption.packId(), true);
+            if (!oldOption.isVanilla()) setPackEnabled(oldOption.packId(), false);
+            if (!newOption.isVanilla()) setPackEnabled(newOption.packId(), true);
+        }
 
         ConfigManager.getInstance().set("textures." + slot.getId(), clamped);
     }
