@@ -46,7 +46,8 @@ public abstract class ShulkerTooltipDataMixin {
     private static final int SHULKER_BOX_SLOTS = 27;
     private static final int CHEST_SLOTS = 27;
     private static final int UNDYED_SHULKER_BOX_COLOR = 0xFF976797;
-    private static final int DEFAULT_BACKGROUND_COLOR = 0xFFFFFFFF;
+    /** Default grey preview background for every non-shulker container (chest, hopper, barrel, ...), per explicit spec. */
+    private static final int DEFAULT_BACKGROUND_COLOR = 0xFF808080;
 
     @Inject(method = "getTooltipData", at = @At("RETURN"), cancellable = true)
     private void solstice$addShulkerTooltip(ItemStack stack, CallbackInfoReturnable<Optional<TooltipData>> cir) {

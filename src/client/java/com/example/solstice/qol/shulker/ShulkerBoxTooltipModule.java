@@ -4,6 +4,8 @@ import com.example.solstice.core.config.ConfigManager;
 import com.example.solstice.core.module.AbstractModule;
 import com.example.solstice.core.module.ModuleCategory;
 import com.example.solstice.core.module.ModuleSetting;
+import net.minecraft.block.Block;
+import net.minecraft.block.ShulkerBoxBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.item.ItemStack;
@@ -84,6 +86,30 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
     private ShulkerTooltipData lockedData;
     private int lockedX;
     private int lockedY;
+
+    /**
+     * The stack currently being tooltip-processed, captured by {@code
+     * ItemStackAppendComponentTooltipMixin} at the head of {@code
+     * ItemStack.appendComponentTooltip} - the real vanilla call chain that
+     * leads into {@code ContainerComponent.appendTooltip}, which has no
+     * reference back to the {@link ItemStack}/{@link net.minecraft.item.Item}
+     * it belongs to (its own {@code ComponentsAccess} parameter is the
+     * stack's internal {@code MergedComponentMap}, not the stack itself -
+     * confirmed via decompile, a plain cast would have thrown {@code
+     * ClassCastException}). Re-set every time any component's tooltip is
+     * appended for a stack, so by the time {@code
+     * ContainerComponentAppendTooltipMixin} runs it always reflects the
+     * stack currently being processed.
+     */
+    private ItemStack currentTooltipStack = ItemStack.EMPTY;
+
+    public void setCurrentTooltipStack(ItemStack stack) {
+        this.currentTooltipStack = stack;
+    }
+
+    public boolean isCurrentStackShulkerBox() {
+        return Block.getBlockFromItem(currentTooltipStack.getItem()) instanceof ShulkerBoxBlock;
+    }
 
     private ShulkerBoxTooltipModule() {}
 

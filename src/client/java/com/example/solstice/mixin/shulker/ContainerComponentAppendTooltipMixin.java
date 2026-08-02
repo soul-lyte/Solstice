@@ -23,6 +23,16 @@ import java.util.stream.Stream;
  * the module is enabled, not just while a preview key is held, since the
  * hint itself needs to be visible before any key is pressed to tell the
  * user what to press.
+ *
+ * <p>Empty containers are a special case, per explicit spec: an empty
+ * shulker box still says "Contains 0 Stacks" but never shows the preview
+ * hint (nothing to preview); every other empty container (chest, hopper,
+ * barrel, etc.) says nothing at all - no summary, no hint. A non-empty
+ * container of any kind behaves identically to a non-empty shulker box.
+ * "Is this a shulker box" comes from {@link
+ * ShulkerBoxTooltipModule#isCurrentStackShulkerBox()}, since {@code
+ * ContainerComponent} itself has no reference back to the item it belongs
+ * to - see {@code ItemStackAppendComponentTooltipMixin}.</p>
  */
 @Mixin(ContainerComponent.class)
 public abstract class ContainerComponentAppendTooltipMixin {
@@ -37,6 +47,15 @@ public abstract class ContainerComponentAppendTooltipMixin {
         if (!module.isEnabled()) return;
 
         long stackCount = streamNonEmpty().count();
+        if (stackCount == 0) {
+            if (module.isCurrentStackShulkerBox()) {
+                textConsumer.accept(Text.literal("Contains 0 Stacks"));
+            }
+            // Every other empty container (chest, hopper, barrel, ...) says nothing at all.
+            ci.cancel();
+            return;
+        }
+
         textConsumer.accept(Text.literal(stackCount == 1 ? "Contains 1 Stack" : "Contains " + stackCount + " Stacks"));
         textConsumer.accept(module.getHoverHintText());
         ci.cancel();

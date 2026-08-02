@@ -25,8 +25,9 @@ import java.util.List;
  * {@code provider.getInventoryMaxSize()} technique.</p>
  *
  * <p>{@code backgroundColor} is the shulker box's own dye-derived color
- * (opaque ARGB), or {@code -1} (opaque white, no tint) for non-shulker
- * containers - see {@code ShulkerTooltipDataMixin} for how it's derived.</p>
+ * (opaque ARGB), or a flat default grey for every other container (chest,
+ * hopper, barrel, ...) - see {@code ShulkerTooltipDataMixin} for how it's
+ * derived.</p>
  */
 public record ShulkerTooltipData(List<ItemStack> contents, boolean compact, int totalSlots, int backgroundColor)
         implements TooltipData {

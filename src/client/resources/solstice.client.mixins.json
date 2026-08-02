@@ -22,6 +22,7 @@
     "shulker.ShulkerTooltipDataMixin",
     "shulker.ContainerComponentAppendTooltipMixin",
     "shulker.HandledScreenLockOverlayMixin",
+    "shulker.ItemStackAppendComponentTooltipMixin",
     "startup.SplashScreenMixin",
     "optimization.GlyphDrawerBufferCacheMixin",
     "optimization.SimpleOptionAccessor",

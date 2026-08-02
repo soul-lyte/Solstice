@@ -83,7 +83,7 @@ public final class EntityCullingModule extends AbstractModule {
      * the line of sight (e.g. walking past it) made entities flicker in and out
      * instead of staying visible through a momentary occlusion.
      */
-    private static final long CULL_GRACE_PERIOD_MS = 2000L;
+    private static final long CULL_GRACE_PERIOD_MS = 3000L;
 
     private final Map<UUID, Boolean> visibilityCache = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastCheckedMs = new ConcurrentHashMap<>();
@@ -231,6 +231,11 @@ public final class EntityCullingModule extends AbstractModule {
         Vec3d currentFrom = from;
 
         for (int step = 0; step < MAX_RAY_STEPS; step++) {
+            if (currentFrom.squaredDistanceTo(from) >= totalDistSq) {
+                // Already stepped at or past the target - nothing left in the way.
+                return false;
+            }
+
             RaycastContext ctx = new RaycastContext(
                     currentFrom, to,
                     RaycastContext.ShapeType.VISUAL,
@@ -259,7 +264,16 @@ public final class EntityCullingModule extends AbstractModule {
             if (length < 1.0E-4) {
                 return false;
             }
-            currentFrom = result.getPos().add(remaining.multiply(0.05 / length));
+            // Step a FULL block past the hit point, not a tiny fraction of one - a slab,
+            // fence, or wall can occupy close to a full block's depth along the ray
+            // depending on approach angle, and the previous 0.05-block step needed far
+            // more than the step budget to actually clear that geometry, so it kept
+            // re-hitting the same non-opaque block over and over until the step budget
+            // ran out and this method defensively (and wrongly) reported "blocked" - the
+            // real cause of clearly-visible entities still getting culled. A full-block
+            // step guarantees clearing whatever was hit in a single step, regardless of
+            // its thickness or orientation.
+            currentFrom = result.getPos().add(remaining.multiply(1.0 / length));
         }
         return true;
     }
