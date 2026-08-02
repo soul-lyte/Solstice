@@ -493,7 +493,7 @@ public class SolsticeScreen extends Screen {
 
     private int layoutAdvancedRow(List<TexturesItem> items, int labelY, int cardW) {
         items.add(new TexturesItem(labelY, 12, screenY ->
-                profileRowLabels.add(new ProfileRowLabel("Advanced", SIDE_PAD, screenY))));
+                profileRowLabels.add(new ProfileRowLabel("Advanced - Add your own to get started", SIDE_PAD, screenY))));
         int rowTop = labelY + 12;
 
         record Category(String name, String description, java.util.List<com.example.solstice.textures.TextureSlot> slots) {}

@@ -35,6 +35,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * world in one synchronous burst every interval - the latter is a real stutter
  * risk in mob-dense areas (farms) that this was rewritten to avoid.</p>
  *
+ * <p>Occlusion is sampled at two points (box center + top) rather than a
+ * single ray to the center, and an entity only actually gets hidden after
+ * staying continuously occluded for {@link #CULL_GRACE_PERIOD_MS} - both
+ * exist specifically so momentary/partial occlusion (a fence post, a leaf,
+ * walking past a single block) doesn't make entities flicker in and out.
+ * The grace period is a fixed floor, not something any performance profile
+ * (including Aggressive) can shorten.</p>
+ *
  * <p>Client-only: uses {@link MinecraftClient} and client rendering types.
  * Lives in src/client/java.</p>
  */
@@ -51,8 +59,18 @@ public final class EntityCullingModule extends AbstractModule {
     /** Full-cache sweep interval - bounds memory from despawned entities' stale entries. */
     private static final long CACHE_SWEEP_INTERVAL_MS = 30_000L;
 
+    /**
+     * How long an entity has to stay continuously occluded before it's actually
+     * hidden - a fixed floor, not something any profile (including Aggressive)
+     * can shorten. Without this, a single block/fence post/leaf briefly crossing
+     * the line of sight (e.g. walking past it) made entities flicker in and out
+     * instead of staying visible through a momentary occlusion.
+     */
+    private static final long CULL_GRACE_PERIOD_MS = 2000L;
+
     private final Map<UUID, Boolean> visibilityCache = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastCheckedMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> occludedSinceMs = new ConcurrentHashMap<>();
     private long lastSweepMs = 0;
 
     private EntityCullingModule() {}
@@ -116,15 +134,32 @@ public final class EntityCullingModule extends AbstractModule {
 
         UUID id = entity.getUuid();
         long now = TimeUtil.nowMs();
+        boolean occludedNow;
         Long checkedAt = lastCheckedMs.get(id);
         if (checkedAt == null || now - checkedAt >= cullingIntervalMs) {
-            boolean visible = !isOccluded(entity.getBoundingBox(), client);
-            visibilityCache.put(id, visible);
+            occludedNow = isOccluded(entity.getBoundingBox(), client);
+            visibilityCache.put(id, !occludedNow);
             lastCheckedMs.put(id, now);
-            return visible;
+        } else {
+            occludedNow = !visibilityCache.getOrDefault(id, true);
         }
 
-        return visibilityCache.getOrDefault(id, true);
+        if (!occludedNow) {
+            // Visible right now - always render, and forget any occlusion streak
+            // that was building up, so a brief re-block later starts fresh.
+            occludedSinceMs.remove(id);
+            return true;
+        }
+
+        // Occluded right now, but don't actually hide it until occlusion has held
+        // continuously for the full grace period - a single block/leaf/fence post
+        // crossing the line of sight for a moment shouldn't make the entity flicker.
+        Long since = occludedSinceMs.get(id);
+        if (since == null) {
+            occludedSinceMs.put(id, now);
+            return true;
+        }
+        return now - since < CULL_GRACE_PERIOD_MS;
     }
 
     private void sweepStaleEntriesIfDue() {
@@ -133,15 +168,30 @@ public final class EntityCullingModule extends AbstractModule {
         lastSweepMs = now;
         visibilityCache.clear();
         lastCheckedMs.clear();
+        occludedSinceMs.clear();
     }
 
+    /**
+     * Samples two points (box center + top, roughly chest/head height) instead of
+     * just the center - an entity only counts as occluded if *both* are blocked.
+     * A single-ray-to-center test culled entities that were genuinely still
+     * partly in sight (e.g. most of them visible past a corner block that just
+     * happened to sit on the line to the exact center point) - "not culled at
+     * all if they are in sight" needs more than one sample point to hold up.
+     */
     private boolean isOccluded(Box box, MinecraftClient client) {
         if (client.world == null) return false;
 
         Vec3d cameraPos = client.gameRenderer.getCamera().getCameraPos();
         Vec3d center = box.getCenter();
+        Vec3d top = new Vec3d(center.x, box.maxY, center.z);
+
+        return isRayBlocked(cameraPos, center, client) && isRayBlocked(cameraPos, top, client);
+    }
+
+    private boolean isRayBlocked(Vec3d from, Vec3d to, MinecraftClient client) {
         RaycastContext ctx = new RaycastContext(
-                cameraPos, center,
+                from, to,
                 RaycastContext.ShapeType.VISUAL,
                 RaycastContext.FluidHandling.NONE,
                 ShapeContext.absent()
@@ -150,13 +200,14 @@ public final class EntityCullingModule extends AbstractModule {
         BlockHitResult result = client.world.raycast(ctx);
         if (result.getType() == HitResult.Type.MISS) return false;
 
-        double hitDistSq    = result.getPos().squaredDistanceTo(cameraPos);
-        double entityDistSq = center.squaredDistanceTo(cameraPos);
-        return hitDistSq < entityDistSq - 0.5;
+        double hitDistSq   = result.getPos().squaredDistanceTo(from);
+        double targetDistSq = to.squaredDistanceTo(from);
+        return hitDistSq < targetDistSq - 0.5;
     }
 
     public void clearCache() {
         visibilityCache.clear();
         lastCheckedMs.clear();
+        occludedSinceMs.clear();
     }
 }

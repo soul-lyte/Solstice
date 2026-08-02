@@ -26,7 +26,7 @@ import net.minecraft.text.Text;
  */
 public class ProfileCardWidget extends SolsticeClickableWidget {
 
-    public static final int HEIGHT = 60;
+    public static final int HEIGHT = 48;
     private static final int PADDING = 8;
     private static final int RENAME_W = 40;
     private static final int RENAME_H = 10;

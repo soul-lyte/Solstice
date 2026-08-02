@@ -27,8 +27,13 @@ public final class PerformanceAggressiveProfile implements Profile {
     private static final long GC_INTERVAL_MS = 10_000;
     private static final int MAX_PARTICLES = 256;
     private static final int PARTICLE_FPS_THRESHOLD = 55;
-    private static final int CULLING_INTERVAL_MS = 25;
-    private static final int MAX_RENDER_DISTANCE_BLOCKS = 16;
+    // Softened from 25ms/16 blocks - that combination rechecked occlusion so often and
+    // cut off so close that entities visibly flickered in and out behind minor cover.
+    // EntityCullingModule's own 2-second grace period is a fixed floor no profile can
+    // shorten, but a merely-frequent recheck interval and a very short distance were
+    // still their own separate source of aggressiveness worth softening here too.
+    private static final int CULLING_INTERVAL_MS = 100;
+    private static final int MAX_RENDER_DISTANCE_BLOCKS = 24;
     private static final int SEND_BUFFER_BYTES = 32768;
     private static final int RECEIVE_BUFFER_BYTES = 65536;
     private static final boolean TCP_NO_DELAY = true;

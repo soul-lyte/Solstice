@@ -157,8 +157,13 @@ public class ModuleCardWidget extends SolsticeClickableWidget {
             // has a real settings list, and directly clickable (left-click) to
             // open it without toggling the module underneath it.
             int[] r = gearIconRect();
+            // The 10-arg overload defaults its sample region to the on-screen draw size
+            // (r[2]/r[3], 10x10) rather than the real texture size, so it only ever
+            // sampled a 10x10 corner of the actual 32x32 icon - the same drawTexture
+            // region-size bug already found and fixed a few times elsewhere in this
+            // project. The 12-arg overload samples the whole texture and scales it down.
             context.drawTexture(RenderPipelines.GUI_TEXTURED, GEAR_ICON, r[0], r[1], 0f, 0f,
-                    r[2], r[3], GEAR_TEX_SIZE, GEAR_TEX_SIZE);
+                    r[2], r[3], GEAR_TEX_SIZE, GEAR_TEX_SIZE, GEAR_TEX_SIZE, GEAR_TEX_SIZE);
         }
     }
 
