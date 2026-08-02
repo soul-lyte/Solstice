@@ -90,9 +90,9 @@ public abstract class InGameHudScoreboardMixin {
         this.solstice$naturalW = x2 - x1;
 
         HudLayoutManager layout = HudLayoutManager.getInstance();
-        int offsetX = layout.getX("scoreboard", 0);
-        int offsetY = layout.getY("scoreboard", 0);
-        int offsetW = layout.getWidth("scoreboard", 0);
+        int offsetX = layout.getOffsetX("scoreboard", 0);
+        int offsetY = layout.getOffsetY("scoreboard", 0);
+        int offsetW = layout.getOffsetWidth("scoreboard", 0);
         int effectiveW = this.solstice$naturalW + offsetW;
         float scale = this.solstice$naturalW > 0 ? (float) effectiveW / this.solstice$naturalW : 1f;
 

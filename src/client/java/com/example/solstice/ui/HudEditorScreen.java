@@ -177,7 +177,8 @@ public class HudEditorScreen extends Screen {
                 // Mixin-driven scoreboard render only ever derives a single uniform scale off
                 // width (see InGameHudScoreboardMixin's own Javadoc), so there's no natural-height
                 // offset for it to actually honor.
-                layout.setSize(resizingElement.getId(), liveW - naturalW, liveH);
+                layout.setOffsetWidth(resizingElement.getId(), liveW - naturalW);
+                layout.setHeight(resizingElement.getId(), liveH);
             } else {
                 layout.setSize(resizingElement.getId(), liveW, liveH);
             }
@@ -188,7 +189,7 @@ public class HudEditorScreen extends Screen {
             if (draggingElement.hasLiveNaturalAnchor()) {
                 int naturalX = draggingElement.getDefaultX(width, height);
                 int naturalY = draggingElement.getDefaultY(width, height);
-                layout.setPosition(draggingElement.getId(), dragX - naturalX, dragY - naturalY);
+                layout.setOffsetPosition(draggingElement.getId(), dragX - naturalX, dragY - naturalY);
             } else {
                 layout.setPosition(draggingElement.getId(), dragX, dragY);
             }
@@ -216,9 +217,9 @@ public class HudEditorScreen extends Screen {
         int naturalH = element.getHeight();
 
         if (element.hasLiveNaturalAnchor()) {
-            int x = naturalX + layout.getX(id, 0);
-            int y = naturalY + layout.getY(id, 0);
-            int w = naturalW + layout.getWidth(id, 0);
+            int x = naturalX + layout.getOffsetX(id, 0);
+            int y = naturalY + layout.getOffsetY(id, 0);
+            int w = naturalW + layout.getOffsetWidth(id, 0);
             int h = layout.getHeight(id, naturalH);
             return new int[]{x, y, w, h};
         }

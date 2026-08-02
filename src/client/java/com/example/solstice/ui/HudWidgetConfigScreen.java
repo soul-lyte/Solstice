@@ -78,15 +78,16 @@ public class HudWidgetConfigScreen extends Screen {
 
         if (element.hasLiveNaturalAnchor()) {
             // Stored width is an offset from the live natural width, not an absolute target -
-            // see HudElement.hasLiveNaturalAnchor(). The slider shows and edits the effective
-            // (natural + offset) size directly, which reads the same as a normal size slider,
-            // but writes back the offset so it keeps tracking a different natural width later.
+            // see HudElement.hasLiveNaturalAnchor() and HudLayoutManager's dedicated offset_*
+            // keys. The slider shows and edits the effective (natural + offset) size directly,
+            // which reads the same as a normal size slider, but writes back the offset so it
+            // keeps tracking a different natural width later.
             int naturalW = element.getWidth();
-            int effectiveW = naturalW + layout.getWidth(id, 0);
+            int effectiveW = naturalW + layout.getOffsetWidth(id, 0);
             int min = Math.max(10, naturalW - 60);
             addDrawableChild(new SolsticeSliderWidget(x, y, innerW, ROW_H, textRenderer, "Width", min, naturalW + 300, effectiveW,
                     v -> String.valueOf((int) Math.round(v)),
-                    v -> layout.setSize(id, (int) Math.round(v) - element.getWidth(), layout.getHeight(id, element.getHeight()))));
+                    v -> layout.setOffsetWidth(id, (int) Math.round(v) - element.getWidth())));
             y += ROW_H + ROW_GAP;
         } else {
             int width = layout.getWidth(id, element.getWidth());
@@ -98,16 +99,7 @@ public class HudWidgetConfigScreen extends Screen {
         int height = layout.getHeight(id, element.getHeight());
         addDrawableChild(new SolsticeSliderWidget(x, y, innerW, ROW_H, textRenderer, "Height", 10, 100, height,
                 v -> String.valueOf((int) Math.round(v)),
-                // The width default here must match whatever unit is already stored (an offset,
-                // defaulting to 0, for a live-anchor element; an absolute size otherwise) -
-                // reusing element.getWidth() as the fallback regardless of that would, the moment
-                // only Height is ever touched, persist the live-anchor element's *natural* width
-                // as if it were an offset, silently making it render far too wide from then on.
-                // Read fresh on every call (not captured once) so an earlier Width-slider change
-                // this same screen session isn't clobbered back to its old value.
-                v -> layout.setSize(id,
-                        element.hasLiveNaturalAnchor() ? layout.getWidth(id, 0) : layout.getWidth(id, element.getWidth()),
-                        (int) Math.round(v))));
+                v -> layout.setHeight(id, (int) Math.round(v))));
         y += ROW_H + ROW_GAP;
 
         addDrawableChild(new SolsticeButton(panelX + (PANEL_W - 100) / 2, panelY + panelH - 24, 100, 18,
