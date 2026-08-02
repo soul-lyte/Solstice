@@ -31,6 +31,7 @@ public final class ProfileManager {
     private final PerformanceBalancedProfile performanceBalanced = new PerformanceBalancedProfile();
     private final PerformanceLiteProfile performanceLite = new PerformanceLiteProfile();
     private final PerformanceAggressiveProfile performanceAggressive = new PerformanceAggressiveProfile();
+    private final PerformancePracticeProfile performancePractice = new PerformancePracticeProfile();
     private final List<CustomVisualProfile> customVisualProfiles = new ArrayList<>();
     private final List<CustomPerformanceProfile> customPerformanceProfiles = new ArrayList<>();
 
@@ -60,6 +61,7 @@ public final class ProfileManager {
             list.add(performanceLite);
             list.add(performanceBalanced);
             list.add(performanceAggressive);
+            list.add(performancePractice);
             list.addAll(customPerformanceProfiles);
         }
         return list;

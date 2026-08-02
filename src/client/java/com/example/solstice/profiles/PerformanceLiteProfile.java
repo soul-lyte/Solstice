@@ -27,6 +27,7 @@ public final class PerformanceLiteProfile implements Profile {
     private static final long GC_INTERVAL_MS = 30_000;
     private static final int MAX_PARTICLES = 4096;
     private static final int PARTICLE_FPS_THRESHOLD = 40;
+    private static final EntityCullingModule.CullMode CULL_MODE = EntityCullingModule.CullMode.AGGRESSIVE;
     private static final int CULLING_INTERVAL_MS = 50;
     private static final int MAX_RENDER_DISTANCE_BLOCKS = 64;
     private static final int SEND_BUFFER_BYTES = 131072;
@@ -54,8 +55,10 @@ public final class PerformanceLiteProfile implements Profile {
         cfg.set("particle_limiter.max_particles", MAX_PARTICLES);
         cfg.set("particle_limiter.aggressive_fps_threshold", PARTICLE_FPS_THRESHOLD);
 
+        EntityCullingModule.cullMode = CULL_MODE;
         EntityCullingModule.cullingIntervalMs = CULLING_INTERVAL_MS;
         EntityCullingModule.maxRenderDistanceBlocks = MAX_RENDER_DISTANCE_BLOCKS;
+        cfg.set("entity_culling.cull_mode", CULL_MODE.name());
         cfg.set("entity_culling.interval_ms", CULLING_INTERVAL_MS);
         cfg.set("entity_culling.max_distance", MAX_RENDER_DISTANCE_BLOCKS);
 
@@ -74,6 +77,7 @@ public final class PerformanceLiteProfile implements Profile {
                 && MemoryModule.gcHintIntervalMs == GC_INTERVAL_MS
                 && ParticleLimiterModule.maxParticles == MAX_PARTICLES
                 && ParticleLimiterModule.aggressiveCullFpsThreshold == PARTICLE_FPS_THRESHOLD
+                && EntityCullingModule.cullMode == CULL_MODE
                 && EntityCullingModule.cullingIntervalMs == CULLING_INTERVAL_MS
                 && EntityCullingModule.maxRenderDistanceBlocks == MAX_RENDER_DISTANCE_BLOCKS
                 && NetworkModule.sendBufferBytes == SEND_BUFFER_BYTES

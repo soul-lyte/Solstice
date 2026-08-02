@@ -41,7 +41,11 @@ public class DraftProfileCardWidget extends SolsticeClickableWidget {
         context.drawText(textRenderer, "Doesn't match a saved", getX() + PADDING, getY() + 18, ColorPalette.TEXT_SECONDARY, false);
         context.drawText(textRenderer, "profile.", getX() + PADDING, getY() + 27, ColorPalette.TEXT_SECONDARY, false);
 
-        int bx = getX() + PADDING;
+        // Bottom-right, not bottom-left under the text - the button used to sit at the same
+        // x as the "profile." line directly above it, and that line's own y (27, ~8px tall)
+        // genuinely overlapped the button's y (height-20 on a 48px-tall card, i.e. 28) by
+        // several pixels, not just a tight-but-legible layout.
+        int bx = getX() + getWidth() - SAVE_W - PADDING;
         int by = getY() + getHeight() - SAVE_H - 4;
         boolean saveHovered = mouseX >= bx && mouseX < bx + SAVE_W && mouseY >= by && mouseY < by + SAVE_H;
         SolsticeTheme.fillRect(context, bx, by, SAVE_W, SAVE_H, saveHovered ? ColorPalette.BG_HOVER : ColorPalette.BG_SELECTED);
@@ -56,7 +60,7 @@ public class DraftProfileCardWidget extends SolsticeClickableWidget {
         if (!isMouseOver(click.x(), click.y())) {
             return false;
         }
-        int bx = getX() + PADDING;
+        int bx = getX() + getWidth() - SAVE_W - PADDING;
         int by = getY() + getHeight() - SAVE_H - 4;
         if (click.x() >= bx && click.x() < bx + SAVE_W && click.y() >= by && click.y() < by + SAVE_H) {
             SolsticeSounds.playClick();

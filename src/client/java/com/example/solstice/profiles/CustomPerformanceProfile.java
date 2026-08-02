@@ -32,6 +32,7 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
     private long gcIntervalMs;
     private int maxParticles;
     private int particleFpsThreshold;
+    private EntityCullingModule.CullMode cullMode;
     private int cullingIntervalMs;
     private int maxRenderDistanceBlocks;
     private int sendBufferBytes;
@@ -58,6 +59,14 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         gcIntervalMs = cfg.getInt(key("gc_interval_ms"), (int) MemoryModule.gcHintIntervalMs);
         maxParticles = cfg.getInt(key("max_particles"), ParticleLimiterModule.maxParticles);
         particleFpsThreshold = cfg.getInt(key("particle_fps_threshold"), ParticleLimiterModule.aggressiveCullFpsThreshold);
+        String storedCullMode = cfg.getString(key("cull_mode"), EntityCullingModule.cullMode.name());
+        EntityCullingModule.CullMode loadedCullMode;
+        try {
+            loadedCullMode = EntityCullingModule.CullMode.valueOf(storedCullMode);
+        } catch (IllegalArgumentException e) {
+            loadedCullMode = EntityCullingModule.CullMode.AGGRESSIVE;
+        }
+        cullMode = loadedCullMode;
         cullingIntervalMs = cfg.getInt(key("culling_interval_ms"), EntityCullingModule.cullingIntervalMs);
         maxRenderDistanceBlocks = cfg.getInt(key("max_render_distance_blocks"), EntityCullingModule.maxRenderDistanceBlocks);
         sendBufferBytes = cfg.getInt(key("send_buffer_bytes"), NetworkModule.sendBufferBytes);
@@ -76,6 +85,7 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         gcIntervalMs = MemoryModule.gcHintIntervalMs;
         maxParticles = ParticleLimiterModule.maxParticles;
         particleFpsThreshold = ParticleLimiterModule.aggressiveCullFpsThreshold;
+        cullMode = EntityCullingModule.cullMode;
         cullingIntervalMs = EntityCullingModule.cullingIntervalMs;
         maxRenderDistanceBlocks = EntityCullingModule.maxRenderDistanceBlocks;
         sendBufferBytes = NetworkModule.sendBufferBytes;
@@ -91,6 +101,7 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         cfg.set(key("gc_interval_ms"), (int) gcIntervalMs);
         cfg.set(key("max_particles"), maxParticles);
         cfg.set(key("particle_fps_threshold"), particleFpsThreshold);
+        cfg.set(key("cull_mode"), cullMode.name());
         cfg.set(key("culling_interval_ms"), cullingIntervalMs);
         cfg.set(key("max_render_distance_blocks"), maxRenderDistanceBlocks);
         cfg.set(key("send_buffer_bytes"), sendBufferBytes);
@@ -131,8 +142,10 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
         cfg.set("particle_limiter.max_particles", maxParticles);
         cfg.set("particle_limiter.aggressive_fps_threshold", particleFpsThreshold);
 
+        EntityCullingModule.cullMode = cullMode;
         EntityCullingModule.cullingIntervalMs = cullingIntervalMs;
         EntityCullingModule.maxRenderDistanceBlocks = maxRenderDistanceBlocks;
+        cfg.set("entity_culling.cull_mode", cullMode.name());
         cfg.set("entity_culling.interval_ms", cullingIntervalMs);
         cfg.set("entity_culling.max_distance", maxRenderDistanceBlocks);
 
@@ -154,6 +167,7 @@ public final class CustomPerformanceProfile implements Profile, Renameable {
                 && MemoryModule.gcHintIntervalMs == gcIntervalMs
                 && ParticleLimiterModule.maxParticles == maxParticles
                 && ParticleLimiterModule.aggressiveCullFpsThreshold == particleFpsThreshold
+                && EntityCullingModule.cullMode == cullMode
                 && EntityCullingModule.cullingIntervalMs == cullingIntervalMs
                 && EntityCullingModule.maxRenderDistanceBlocks == maxRenderDistanceBlocks
                 && NetworkModule.sendBufferBytes == sendBufferBytes

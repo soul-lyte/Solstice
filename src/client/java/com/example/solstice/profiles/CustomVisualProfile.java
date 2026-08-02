@@ -5,18 +5,21 @@ import com.example.solstice.core.module.Module;
 import com.example.solstice.core.module.ModuleCategory;
 import com.example.solstice.core.module.ModuleRegistry;
 import com.example.solstice.qol.crosshair.CrosshairModule;
-import com.example.solstice.textures.TexturePackManager;
-import com.example.solstice.textures.TextureSlots;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * One user-saveable "Custom" slot for the Visual profile row. Captures
- * which QOL modules are enabled, the crosshair style, and the GUI skin
- * index at the moment it's saved (via {@link #captureAndSave()}), so it
- * can be re-applied and drift-compared against later - distinct from
- * whatever the live, unsaved state currently is.
+ * which QOL modules are enabled and the crosshair style at the moment it's
+ * saved (via {@link #captureAndSave()}), so it can be re-applied and
+ * drift-compared against later - distinct from whatever the live, unsaved
+ * state currently is.
+ *
+ * <p>Deliberately does not touch or track the Textures tab (GUI skin or
+ * anything else there) - per explicit direction, a Visual profile's
+ * identity is about QOL modules and the crosshair, not textures, so
+ * switching a texture never makes a saved Visual profile stop matching.</p>
  *
  * <p>Keyed by an {@code index} rather than being a singleton - {@link
  * ProfileManager} keeps a list of these (however many the user has saved),
@@ -31,7 +34,6 @@ public final class CustomVisualProfile implements Profile, Renameable {
 
     private String name;
     private final Map<String, Boolean> moduleEnabled = new LinkedHashMap<>();
-    private int guiSkinIndex;
     private int crosshairStyleIndex;
 
     public CustomVisualProfile(int index) {
@@ -46,7 +48,6 @@ public final class CustomVisualProfile implements Profile, Renameable {
     private void load() {
         ConfigManager cfg = ConfigManager.getInstance();
         name = cfg.getString(key("name"), "Custom " + (index + 1));
-        guiSkinIndex = cfg.getInt(key("gui_skin_index"), 0);
         crosshairStyleIndex = cfg.getInt(key("crosshair_style"), CrosshairModule.styleIndex);
         moduleEnabled.clear();
         for (Module module : ModuleRegistry.getInstance().getByCategory(ModuleCategory.QUALITY_OF_LIFE)) {
@@ -54,7 +55,7 @@ public final class CustomVisualProfile implements Profile, Renameable {
         }
     }
 
-    /** Captures the current live QOL module states, crosshair style, and GUI skin as this profile's new saved snapshot. */
+    /** Captures the current live QOL module states and crosshair style as this profile's new saved snapshot. */
     public void captureAndSave() {
         ConfigManager cfg = ConfigManager.getInstance();
         cfg.set(key("name"), name);
@@ -65,8 +66,6 @@ public final class CustomVisualProfile implements Profile, Renameable {
         }
         crosshairStyleIndex = CrosshairModule.styleIndex;
         cfg.set(key("crosshair_style"), crosshairStyleIndex);
-        guiSkinIndex = TexturePackManager.getInstance().getSelectedIndex(TextureSlots.GUI_SKIN);
-        cfg.set(key("gui_skin_index"), guiSkinIndex);
     }
 
     @Override
@@ -87,8 +86,6 @@ public final class CustomVisualProfile implements Profile, Renameable {
             }
         }
         CrosshairModule.setStyleIndex(crosshairStyleIndex);
-        TexturePackManager.getInstance().applyIndex(TextureSlots.GUI_SKIN, guiSkinIndex);
-        TexturePackManager.getInstance().reload();
     }
 
     @Override
@@ -99,9 +96,6 @@ public final class CustomVisualProfile implements Profile, Renameable {
                 return false;
             }
         }
-        if (CrosshairModule.styleIndex != crosshairStyleIndex) {
-            return false;
-        }
-        return TexturePackManager.getInstance().getSelectedIndex(TextureSlots.GUI_SKIN) == guiSkinIndex;
+        return CrosshairModule.styleIndex == crosshairStyleIndex;
     }
 }

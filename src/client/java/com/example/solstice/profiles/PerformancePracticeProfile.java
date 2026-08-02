@@ -8,43 +8,43 @@ import com.example.solstice.performance.render.ParticleLimiterModule;
 import com.example.solstice.performance.render.RenderModule;
 
 /**
- * The heaviest tier - built for genuinely low-end machines, cutting every
- * tunable this project exposes as far as reasonable for maximum FPS: a
- * small particle cap, a short entity-culling distance, frequent/eager GC
- * hints, small network buffers. Per explicit direction: "for lower end
- * PCs, cut everything you can for maximum fps".
+ * The heaviest tier of all, after Aggressive - built specifically for PvP
+ * practice servers where nothing besides other players matters, per explicit
+ * direction: "make it ultra aggressive cull every entity besides player
+ * (never cull players), make every performance module pushed to their max
+ * level of optimization, really the maximum optimization possible."
+ *
+ * <p>Uses {@link EntityCullingModule.CullMode#PRACTICE} - every non-player
+ * entity is culled outright, unconditionally, with no distance or occlusion
+ * check at all (players are still never culled - see {@code
+ * EntityCullingModule.shouldRender}'s own player check, unconditional across
+ * every mode). Every other tunable this project exposes is pushed to
+ * whichever end of its real, allowed range ({@code getSettings()}'s own
+ * min/max) is the more aggressive direction - not just "as far as
+ * Aggressive," genuinely as far as the sliders go.</p>
  *
  * <p>Never touches {@code RenderModule}'s dynamic-render-distance fields or
  * {@link com.example.solstice.viewdistance.ViewDistanceModule} at all -
- * per explicit instruction, none of the three performance profiles should
- * touch view-distance-related settings in any way, not even to reset them.</p>
+ * per explicit instruction, none of the performance profiles should touch
+ * view-distance-related settings in any way, not even to reset them.</p>
  */
-public final class PerformanceAggressiveProfile implements Profile {
+public final class PerformancePracticeProfile implements Profile {
 
-    private static final int MINIMIZED_SLEEP_MS = 500;
+    private static final int MINIMIZED_SLEEP_MS = 800;
 
-    private static final double GC_THRESHOLD = 0.65;
-    private static final long GC_INTERVAL_MS = 10_000;
+    private static final double GC_THRESHOLD = 0.50;
+    private static final long GC_INTERVAL_MS = 5_000;
     private static final int MAX_PARTICLES = 256;
-    private static final int PARTICLE_FPS_THRESHOLD = 55;
-    // Kept as the original occlusion-raycast mode per explicit direction, even though the
-    // Balanced tier moved to EntityCullingModule.CullMode.CONSERVATIVE after real playtesting
-    // found the raycast approach too eager for everyday play - Aggressive is specifically the
-    // "cut everything for low-end PCs" tier, where that tradeoff is the point.
-    private static final EntityCullingModule.CullMode CULL_MODE = EntityCullingModule.CullMode.AGGRESSIVE;
-    // Softened from 25ms/16 blocks - that combination rechecked occlusion so often and
-    // cut off so close that entities visibly flickered in and out behind minor cover.
-    // EntityCullingModule's own 2-second grace period is a fixed floor no profile can
-    // shorten, but a merely-frequent recheck interval and a very short distance were
-    // still their own separate source of aggressiveness worth softening here too.
-    private static final int CULLING_INTERVAL_MS = 100;
-    private static final int MAX_RENDER_DISTANCE_BLOCKS = 24;
-    private static final int SEND_BUFFER_BYTES = 32768;
-    private static final int RECEIVE_BUFFER_BYTES = 65536;
+    private static final int PARTICLE_FPS_THRESHOLD = 120;
+    private static final EntityCullingModule.CullMode CULL_MODE = EntityCullingModule.CullMode.PRACTICE;
+    private static final int CULLING_INTERVAL_MS = 16;
+    private static final int MAX_RENDER_DISTANCE_BLOCKS = 16;
+    private static final int SEND_BUFFER_BYTES = 16384;
+    private static final int RECEIVE_BUFFER_BYTES = 16384;
     private static final boolean TCP_NO_DELAY = true;
 
-    @Override public String getName() { return "Aggressive"; }
-    @Override public String getDescription() { return "Built for lower-end PCs - cuts every tunable as far as reasonable for maximum FPS. Never touches render/view distance."; }
+    @Override public String getName() { return "Practice"; }
+    @Override public String getDescription() { return "Made for PvP practice servers, where nothing besides other players matters - culls every non-player entity outright and pushes every performance tunable to its maximum."; }
     @Override public ProfileCategory getCategory() { return ProfileCategory.PERFORMANCE; }
 
     @Override

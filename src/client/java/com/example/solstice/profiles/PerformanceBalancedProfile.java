@@ -14,6 +14,16 @@ import com.example.solstice.performance.render.RenderModule;
  * {@link PerformanceAggressiveProfile}. Per explicit direction: "the perfect
  * compromise for performance without making too many cuts".
  *
+ * <p>Uses {@link EntityCullingModule.CullMode#CONSERVATIVE} rather than the
+ * occlusion-raycast mode the other tiers keep - real playtesting found the
+ * raycast approach still culled plainly-visible animals at range (terrain
+ * occlusion false positives are inherent to that technique, not a bug left
+ * to fix), which isn't the "moderate, unobtrusive" experience this tier is
+ * supposed to be. Conservative only culls stacked mob piles and cave mobs
+ * buried deep below the player - see {@code EntityCullingModule}'s own
+ * Javadoc. {@link PerformanceAggressiveProfile} deliberately keeps the old
+ * occlusion mode unchanged, per explicit direction.</p>
+ *
  * <p>Never touches {@code RenderModule}'s dynamic-render-distance fields or
  * {@link com.example.solstice.viewdistance.ViewDistanceModule} at all -
  * per explicit instruction, none of the three performance profiles should
@@ -27,6 +37,7 @@ public final class PerformanceBalancedProfile implements Profile {
     private static final long GC_INTERVAL_MS = 25_000;
     private static final int MAX_PARTICLES = 2048;
     private static final int PARTICLE_FPS_THRESHOLD = 45;
+    private static final EntityCullingModule.CullMode CULL_MODE = EntityCullingModule.CullMode.CONSERVATIVE;
     private static final int CULLING_INTERVAL_MS = 40;
     private static final int MAX_RENDER_DISTANCE_BLOCKS = 48;
     private static final int SEND_BUFFER_BYTES = 98304;
@@ -54,8 +65,10 @@ public final class PerformanceBalancedProfile implements Profile {
         cfg.set("particle_limiter.max_particles", MAX_PARTICLES);
         cfg.set("particle_limiter.aggressive_fps_threshold", PARTICLE_FPS_THRESHOLD);
 
+        EntityCullingModule.cullMode = CULL_MODE;
         EntityCullingModule.cullingIntervalMs = CULLING_INTERVAL_MS;
         EntityCullingModule.maxRenderDistanceBlocks = MAX_RENDER_DISTANCE_BLOCKS;
+        cfg.set("entity_culling.cull_mode", CULL_MODE.name());
         cfg.set("entity_culling.interval_ms", CULLING_INTERVAL_MS);
         cfg.set("entity_culling.max_distance", MAX_RENDER_DISTANCE_BLOCKS);
 
@@ -74,6 +87,7 @@ public final class PerformanceBalancedProfile implements Profile {
                 && MemoryModule.gcHintIntervalMs == GC_INTERVAL_MS
                 && ParticleLimiterModule.maxParticles == MAX_PARTICLES
                 && ParticleLimiterModule.aggressiveCullFpsThreshold == PARTICLE_FPS_THRESHOLD
+                && EntityCullingModule.cullMode == CULL_MODE
                 && EntityCullingModule.cullingIntervalMs == CULLING_INTERVAL_MS
                 && EntityCullingModule.maxRenderDistanceBlocks == MAX_RENDER_DISTANCE_BLOCKS
                 && NetworkModule.sendBufferBytes == SEND_BUFFER_BYTES

@@ -417,6 +417,14 @@ public class SolsticeScreen extends Screen {
 
         TexturePresetManager presets = TexturePresetManager.getInstance();
         TexturePreset selected = presets.getSelected();
+        // A saved combo describes the current state more specifically than its own base Preset
+        // alone (Preset + all three Advanced indices, vs just the Preset) - if one currently
+        // matches, let its own card carry the "selected" highlight and suppress it here, rather
+        // than both a plain Preset card and a combo card that shares its same base Preset both
+        // showing selected at once (confirmed real, not just theoretically possible: saving a
+        // combo while a Preset is active means the combo's own presetId is that same Preset,
+        // so clicking the combo re-selects it, leaving it looking "still selected" too).
+        boolean anyComboMatches = presets.getSavedCombos().stream().anyMatch(presets::matchesCurrentState);
 
         List<TexturePreset> allPresets = presets.getAllPresets();
         int totalW = width - SIDE_PAD * 2;
@@ -427,7 +435,7 @@ public class SolsticeScreen extends Screen {
         for (TexturePreset preset : allPresets) {
             int cx = SIDE_PAD + col * (cardW + CARD_GAP);
             int naturalY = rowTop + row * (TexturePresetCardWidget.HEIGHT + CARD_GAP);
-            boolean isSelected = preset.id().equals(selected.id());
+            boolean isSelected = preset.id().equals(selected.id()) && !anyComboMatches;
             items.add(new TexturesItem(naturalY, TexturePresetCardWidget.HEIGHT, screenY -> {
                 TexturePresetCardWidget card = new TexturePresetCardWidget(cx, screenY, cardW, preset, textRenderer,
                         isSelected, () -> {
