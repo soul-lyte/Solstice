@@ -26,8 +26,6 @@ import java.util.List;
  */
 public final class TexturePresetManager {
 
-    private static final TexturePresetManager INSTANCE = new TexturePresetManager();
-
     private static final String SELECTED_KEY = "textures.preset.selected";
     private static final String ADDED_COUNT_KEY = "textures.preset.added.count";
     private static final String SAVED_COUNT_KEY = "textures.preset.saved.count";
@@ -41,6 +39,16 @@ public final class TexturePresetManager {
     // installed themselves, its content now shows up automatically in the
     // Advanced row instead of Solstice ever shipping the pack itself.
     public static final List<TexturePreset> BUILTIN = List.of(VANILLA);
+
+    // Must come after VANILLA/BUILTIN above, not before - real bug, not just style: static
+    // fields initialize top-to-bottom in declaration order, and the constructor below reads
+    // VANILLA.id() (for a saved combo's default preset id) - with INSTANCE declared first,
+    // VANILLA was still null at that point, throwing a NullPointerException wrapped in
+    // ExceptionInInitializerError the moment this class was first touched. Only crashed once
+    // a real saved combo actually existed in config (SAVED_COUNT_KEY > 0), which is also why
+    // launch-verifying against a fresh dev-environment config never caught it - same class of
+    // gap as this project's other "only exercised by real content/state" Mixin cases.
+    private static final TexturePresetManager INSTANCE = new TexturePresetManager();
 
     /** One saved combo: which Preset (by id) plus the Advanced row's three category slot indices. */
     public record SavedCombo(int index, String name, String presetId, int toolsIndex, int utilitiesIndex, int armorIndex) {}
