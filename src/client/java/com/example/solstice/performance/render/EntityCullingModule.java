@@ -5,6 +5,7 @@ import com.example.solstice.core.module.AbstractModule;
 import com.example.solstice.core.module.ModuleCategory;
 import com.example.solstice.core.module.ModuleSetting;
 import com.example.solstice.core.util.TimeUtil;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
@@ -14,6 +15,7 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
+import net.minecraft.world.World;
 
 import java.util.Map;
 import java.util.UUID;
@@ -35,13 +37,28 @@ import java.util.concurrent.ConcurrentHashMap;
  * world in one synchronous burst every interval - the latter is a real stutter
  * risk in mob-dense areas (farms) that this was rewritten to avoid.</p>
  *
- * <p>Occlusion is sampled at two points (box center + top) rather than a
- * single ray to the center, and an entity only actually gets hidden after
- * staying continuously occluded for {@link #CULL_GRACE_PERIOD_MS} - both
- * exist specifically so momentary/partial occlusion (a fence post, a leaf,
- * walking past a single block) doesn't make entities flicker in and out.
- * The grace period is a fixed floor, not something any performance profile
- * (including Aggressive) can shorten.</p>
+ * <p>Occlusion is sampled at all 8 corners of the entity's bounding box (not
+ * just the center) - occluded only if <em>every</em> corner is blocked - and
+ * an entity only actually gets hidden after staying continuously occluded
+ * for {@link #CULL_GRACE_PERIOD_MS}. Both exist so a genuinely still-visible
+ * sliver of an entity (only its feet showing below a wall, an arm sticking
+ * out past a corner) never gets culled, and momentary/partial occlusion
+ * (a fence post, walking past a single block) doesn't make entities flicker
+ * in and out. The grace period is a fixed floor, not something any
+ * performance profile (including Aggressive) can shorten.</p>
+ *
+ * <p>Each sample ray also sees through non-occluding blocks instead of
+ * stopping at the first thing it geometrically touches - {@link
+ * net.minecraft.world.RaycastContext.ShapeType#VISUAL} registers a hit on
+ * <em>any</em> block with real geometry, including glass (a full cube shape,
+ * just rendered translucent) and partial shapes like slabs/stairs/fences
+ * (real geometry in their own occupied portion). A block only actually
+ * counts as blocking if {@link net.minecraft.block.BlockState#isOpaqueFullCube()}
+ * is true for it - real vanilla API for "genuinely opaque and fills the
+ * whole voxel," the same check {@code SectionBuilder} itself uses. Anything
+ * else (glass, slabs, fences, trapdoors, ...) gets stepped past and the ray
+ * continues toward the target, matching what you can actually see with your
+ * own eyes through/around them.</p>
  *
  * <p>Client-only: uses {@link MinecraftClient} and client rendering types.
  * Lives in src/client/java.</p>
@@ -171,38 +188,80 @@ public final class EntityCullingModule extends AbstractModule {
         occludedSinceMs.clear();
     }
 
+    /** Bounded so a thick stack of see-through blocks (many glass panes in a row) can't loop forever. */
+    private static final int MAX_RAY_STEPS = 6;
+
     /**
-     * Samples two points (box center + top, roughly chest/head height) instead of
-     * just the center - an entity only counts as occluded if *both* are blocked.
-     * A single-ray-to-center test culled entities that were genuinely still
-     * partly in sight (e.g. most of them visible past a corner block that just
-     * happened to sit on the line to the exact center point) - "not culled at
-     * all if they are in sight" needs more than one sample point to hold up.
+     * Occluded only if every one of the box's 8 corners is blocked - if even one
+     * corner has a clear line of sight, some real part of the entity is visible
+     * and it must render (e.g. just its feet showing below the bottom edge of a
+     * wall, hit by the two bottom-Y corners on that side).
      */
     private boolean isOccluded(Box box, MinecraftClient client) {
         if (client.world == null) return false;
 
         Vec3d cameraPos = client.gameRenderer.getCamera().getCameraPos();
-        Vec3d center = box.getCenter();
-        Vec3d top = new Vec3d(center.x, box.maxY, center.z);
+        double[] xs = {box.minX, box.maxX};
+        double[] ys = {box.minY, box.maxY};
+        double[] zs = {box.minZ, box.maxZ};
 
-        return isRayBlocked(cameraPos, center, client) && isRayBlocked(cameraPos, top, client);
+        for (double x : xs) {
+            for (double y : ys) {
+                for (double z : zs) {
+                    if (!isRayBlocked(cameraPos, new Vec3d(x, y, z), client)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
+    /**
+     * Casts toward {@code to}, but a hit on a block that isn't genuinely opaque
+     * and full ({@link BlockState#isOpaqueFullCube()}) doesn't stop the ray - it
+     * steps just past that block and keeps going, so glass/slabs/fences/etc.
+     * don't count as blocking even though they have real raycast geometry.
+     */
     private boolean isRayBlocked(Vec3d from, Vec3d to, MinecraftClient client) {
-        RaycastContext ctx = new RaycastContext(
-                from, to,
-                RaycastContext.ShapeType.VISUAL,
-                RaycastContext.FluidHandling.NONE,
-                ShapeContext.absent()
-        );
+        World world = client.world;
+        if (world == null) return false;
 
-        BlockHitResult result = client.world.raycast(ctx);
-        if (result.getType() == HitResult.Type.MISS) return false;
+        double totalDistSq = from.squaredDistanceTo(to);
+        Vec3d currentFrom = from;
 
-        double hitDistSq   = result.getPos().squaredDistanceTo(from);
-        double targetDistSq = to.squaredDistanceTo(from);
-        return hitDistSq < targetDistSq - 0.5;
+        for (int step = 0; step < MAX_RAY_STEPS; step++) {
+            RaycastContext ctx = new RaycastContext(
+                    currentFrom, to,
+                    RaycastContext.ShapeType.VISUAL,
+                    RaycastContext.FluidHandling.NONE,
+                    ShapeContext.absent()
+            );
+
+            BlockHitResult result = world.raycast(ctx);
+            if (result.getType() == HitResult.Type.MISS) {
+                return false;
+            }
+
+            double hitDistSq = result.getPos().squaredDistanceTo(from);
+            if (hitDistSq >= totalDistSq - 0.5) {
+                // The "hit" landed at/past the target itself - not a real occluder in the way.
+                return false;
+            }
+
+            BlockState hitState = world.getBlockState(result.getBlockPos());
+            if (hitState.isOpaqueFullCube()) {
+                return true;
+            }
+
+            Vec3d remaining = to.subtract(currentFrom);
+            double length = remaining.length();
+            if (length < 1.0E-4) {
+                return false;
+            }
+            currentFrom = result.getPos().add(remaining.multiply(0.05 / length));
+        }
+        return true;
     }
 
     public void clearCache() {
