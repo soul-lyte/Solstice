@@ -65,12 +65,11 @@ public class HudEditorScreen extends Screen {
             boolean resizing = element == resizingElement;
             String id = element.getId();
 
-            int defaultX = element.getDefaultX(width, height);
-            int defaultY = element.getDefaultY(width, height);
-            int x = dragging ? dragX : layout.getX(id, defaultX);
-            int y = dragging ? dragY : layout.getY(id, defaultY);
-            int w = resizing ? liveW : layout.getWidth(id, element.getWidth());
-            int h = resizing ? liveH : layout.getHeight(id, element.getHeight());
+            int[] settled = resolveSettledBounds(element);
+            int x = dragging ? dragX : settled[0];
+            int y = dragging ? dragY : settled[1];
+            int w = resizing ? liveW : settled[2];
+            int h = resizing ? liveH : settled[3];
             boolean visible = !hasVisibilityToggle(element) || layout.isVisible(id, element.isVisibleByDefault());
 
             if (visible) {
@@ -113,10 +112,11 @@ public class HudEditorScreen extends Screen {
         int my = (int) click.y();
         for (HudElement element : layout.getElements()) {
             String id = element.getId();
-            int x = layout.getX(id, element.getDefaultX(width, height));
-            int y = layout.getY(id, element.getDefaultY(width, height));
-            int w = layout.getWidth(id, element.getWidth());
-            int h = layout.getHeight(id, element.getHeight());
+            int[] settled = resolveSettledBounds(element);
+            int x = settled[0];
+            int y = settled[1];
+            int w = settled[2];
+            int h = settled[3];
 
             if (hasVisibilityToggle(element) && contains(toggleRect(element, x, y, w), mx, my)) {
                 boolean current = layout.isVisible(id, element.isVisibleByDefault());
@@ -169,17 +169,65 @@ public class HudEditorScreen extends Screen {
 
     @Override
     public boolean mouseReleased(Click click) {
+        HudLayoutManager layout = HudLayoutManager.getInstance();
         if (resizingElement != null) {
-            HudLayoutManager.getInstance().setSize(resizingElement.getId(), liveW, liveH);
+            if (resizingElement.hasLiveNaturalAnchor()) {
+                int naturalW = resizingElement.getWidth();
+                // Height stays a plain absolute value even for live-anchor elements - the real
+                // Mixin-driven scoreboard render only ever derives a single uniform scale off
+                // width (see InGameHudScoreboardMixin's own Javadoc), so there's no natural-height
+                // offset for it to actually honor.
+                layout.setSize(resizingElement.getId(), liveW - naturalW, liveH);
+            } else {
+                layout.setSize(resizingElement.getId(), liveW, liveH);
+            }
             resizingElement = null;
             return true;
         }
         if (draggingElement != null) {
-            HudLayoutManager.getInstance().setPosition(draggingElement.getId(), dragX, dragY);
+            if (draggingElement.hasLiveNaturalAnchor()) {
+                int naturalX = draggingElement.getDefaultX(width, height);
+                int naturalY = draggingElement.getDefaultY(width, height);
+                layout.setPosition(draggingElement.getId(), dragX - naturalX, dragY - naturalY);
+            } else {
+                layout.setPosition(draggingElement.getId(), dragX, dragY);
+            }
             draggingElement = null;
             return true;
         }
         return super.mouseReleased(click);
+    }
+
+    /**
+     * Resolves an element's current settled (not actively dragging/resizing)
+     * on-screen {@code {x, y, w, h}}. For a plain element this is just its
+     * stored absolute position/size (defaulting to {@link HudElement#getDefaultX}/
+     * {@link HudElement#getDefaultY}/{@link HudElement#getWidth()}/{@link
+     * HudElement#getHeight()} the first time). For a {@link HudElement#hasLiveNaturalAnchor()}
+     * element, the stored X/Y/width are offsets added to whatever the live
+     * natural position/width currently is - see that method's own Javadoc.
+     */
+    private int[] resolveSettledBounds(HudElement element) {
+        HudLayoutManager layout = HudLayoutManager.getInstance();
+        String id = element.getId();
+        int naturalX = element.getDefaultX(width, height);
+        int naturalY = element.getDefaultY(width, height);
+        int naturalW = element.getWidth();
+        int naturalH = element.getHeight();
+
+        if (element.hasLiveNaturalAnchor()) {
+            int x = naturalX + layout.getX(id, 0);
+            int y = naturalY + layout.getY(id, 0);
+            int w = naturalW + layout.getWidth(id, 0);
+            int h = layout.getHeight(id, naturalH);
+            return new int[]{x, y, w, h};
+        }
+        return new int[]{
+                layout.getX(id, naturalX),
+                layout.getY(id, naturalY),
+                layout.getWidth(id, naturalW),
+                layout.getHeight(id, naturalH)
+        };
     }
 
     /**

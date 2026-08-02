@@ -34,6 +34,23 @@ public interface HudElement {
     /** Whether this element starts visible before the user ever touches its toggle. True by default. */
     default boolean isVisibleByDefault() { return true; }
 
+    /**
+     * True for an element whose natural (unmoved, unresized) position/width
+     * genuinely varies live - not just with screen size, but with real
+     * content it doesn't control (the scoreboard's natural anchor shifts
+     * with its longest entry, and differs from server to server). For such
+     * an element, {@link com.example.solstice.core.hud.HudLayoutManager}
+     * stores the user's adjustment as an OFFSET from whatever the live
+     * natural position/width currently is, not an absolute target - so
+     * moving it 10px left of natural on one server keeps it 10px left of
+     * natural on a different server whose natural anchor sits somewhere
+     * else entirely, and a never-touched element always tracks the live
+     * natural value exactly. Plain absolute storage (the default, {@code
+     * false}) is correct for every other element, whose default position
+     * only depends on screen size, not on live game state.
+     */
+    default boolean hasLiveNaturalAnchor() { return false; }
+
     /** Draws this element at the given top-left position. */
     void render(DrawContext context, int x, int y);
 }

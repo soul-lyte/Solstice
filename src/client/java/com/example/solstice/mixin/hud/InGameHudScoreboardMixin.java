@@ -23,82 +23,109 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * so instead of guessing local-variable slot ordinals (fragile - this
  * method reuses several int slots for unrelated values partway through,
  * confirmed via a full {@code javap -c -l} bytecode read), this redirects
- * the actual draw calls themselves and shifts/scales their already-computed
- * coordinates. Robust because it only depends on each call's own method
- * descriptor (plus an ordinal to tell the two identical {@code fill} calls
- * apart), never on local-slot numbering.
+ * the actual draw calls themselves, leaves their own coordinates untouched,
+ * and instead wraps the whole thing in one matrix transform. Robust because
+ * it only depends on each call's own method descriptor (plus an ordinal to
+ * tell the two identical {@code fill} calls apart), never on local-slot
+ * numbering.
  *
  * <p>The first {@code fill} call (the header background bar) is always the
  * top-left corner of the whole panel, at vanilla's own natural position -
  * confirmed via decompile: {@code fill(q - 2, u - 9 - 1, r, u - 1, t)}, so
  * undoing that {@code -2}/{@code -9-1}/{@code +1} recovers vanilla's own
  * {@code q}/{@code u} anchor without ever touching a local variable
- * directly. That header call's own width ({@code x2 - x1}) is also the
- * *only* natural-size number available without deeper hooks - real total
- * height varies with the number of scoreboard entries, which isn't known
- * this early - so resizing scales both axes uniformly off that one width
- * figure. A reasonable simplification, not pixel-perfect for every entry
- * count, but real: growing the box's stored width does grow the whole
- * panel (text included), not just reposition it.</p>
+ * directly. The second {@code fill} call (the body background, confirmed
+ * via decompile to be a single call spanning every row, not one per row)
+ * gives the real total height, which the header call alone can't - varies
+ * with the live entry count, not knowable that early. Resizing still
+ * scales both axes uniformly off the header's width figure (not
+ * pixel-perfect for every entry count, but real: growing the box's stored
+ * width does grow the whole panel, text included, not just reposition it).</p>
+ *
+ * <p><b>Stored X/Y/width are offsets from the live natural anchor, not
+ * absolute targets</b> - see {@link com.example.solstice.core.hud.HudElement#hasLiveNaturalAnchor()}.
+ * The transform below applies the offset as a plain, unscaled outer
+ * translate (first call, so it's outermost - JOML's {@code
+ * Matrix3x2fStack} composes each subsequent call as an additional inner
+ * transform, confirmed by this project's own established
+ * translate/scale/translate-back pattern already scaling correctly around
+ * the natural anchor), specifically so the offset itself is never affected
+ * by the resize scale - a fixed "moved 10px left of natural" stays exactly
+ * that on every server, instead of also growing/shrinking by whatever the
+ * current resize scale happens to be.</p>
+ *
+ * <p>No longer skips its own body (the old HEAD-cancel) when the element is
+ * toggled off - {@link com.example.solstice.ui.ScoreboardHudElement}'s live
+ * bounds cache needs this to keep running (and {@link
+ * com.example.solstice.ui.ScoreboardHudElement#recordRealNaturalBounds}
+ * called) even while hidden, so the HUD editor still knows exactly where a
+ * currently-hidden scoreboard would be without needing to re-enable it
+ * first. {@link #solstice$hidden} instead individually gates each actual
+ * draw call, leaving the position/size math (and the bounds capture it
+ * feeds) running unconditionally.</p>
  */
 @Mixin(InGameHud.class)
 public abstract class InGameHudScoreboardMixin {
 
     private static final String TARGET = "renderScoreboardSidebar(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/scoreboard/ScoreboardObjective;)V";
 
-    @Unique private int solstice$deltaX;
-    @Unique private int solstice$deltaY;
-    @Unique private float solstice$scale = 1f;
+    @Unique private boolean solstice$hidden;
+    @Unique private int solstice$naturalTopY;
+    @Unique private int solstice$naturalX;
+    @Unique private int solstice$naturalY;
+    @Unique private int solstice$naturalW;
 
-    /** Matches {@code BossBarHudMixin}'s "hidden means fully invisible" behavior. */
-    @Inject(method = TARGET, at = @At("HEAD"), cancellable = true)
-    private void solstice$hideIfDisabled(DrawContext context, net.minecraft.scoreboard.ScoreboardObjective objective, CallbackInfo ci) {
+    @Inject(method = TARGET, at = @At("HEAD"))
+    private void solstice$checkHidden(DrawContext context, net.minecraft.scoreboard.ScoreboardObjective objective, CallbackInfo ci) {
         HudLayoutManager layout = HudLayoutManager.getInstance();
-        if (!layout.isMasterVisible() || !layout.isVisible("scoreboard", true)) {
-            ci.cancel();
-        }
+        this.solstice$hidden = !layout.isMasterVisible() || !layout.isVisible("scoreboard", true);
     }
 
     @Redirect(method = TARGET, at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V", ordinal = 0))
     private void solstice$onHeaderFill(DrawContext context, int x1, int y1, int x2, int y2, int color) {
-        int naturalX = x1 + 2;
-        int naturalY = y1 + 10;
-        int naturalW = x2 - x1;
+        this.solstice$naturalTopY = y1;
+        this.solstice$naturalX = x1 + 2;
+        this.solstice$naturalY = y1 + 10;
+        this.solstice$naturalW = x2 - x1;
 
-        // So the HUD editor's draggable box can use the same real, content-dependent
-        // baseline this Mixin computes its own delta from - see ScoreboardHudElement's
-        // own Javadoc for the bug this fixes.
-        com.example.solstice.ui.ScoreboardHudElement.recordRealNaturalBounds(naturalX, naturalY, naturalW);
-
-        int storedX = HudLayoutManager.getInstance().getX("scoreboard", naturalX);
-        int storedY = HudLayoutManager.getInstance().getY("scoreboard", naturalY);
-        int storedW = HudLayoutManager.getInstance().getWidth("scoreboard", naturalW);
-
-        this.solstice$scale = naturalW > 0 ? (float) storedW / naturalW : 1f;
-        this.solstice$deltaX = storedX - naturalX;
-        this.solstice$deltaY = storedY - naturalY;
+        HudLayoutManager layout = HudLayoutManager.getInstance();
+        int offsetX = layout.getX("scoreboard", 0);
+        int offsetY = layout.getY("scoreboard", 0);
+        int offsetW = layout.getWidth("scoreboard", 0);
+        int effectiveW = this.solstice$naturalW + offsetW;
+        float scale = this.solstice$naturalW > 0 ? (float) effectiveW / this.solstice$naturalW : 1f;
 
         context.getMatrices().pushMatrix();
-        context.getMatrices().translate(naturalX, naturalY);
-        context.getMatrices().scale(this.solstice$scale, this.solstice$scale);
-        context.getMatrices().translate(-naturalX, -naturalY);
+        // Outermost - applied last, so the offset itself is never scaled (see class Javadoc).
+        context.getMatrices().translate(offsetX, offsetY);
+        context.getMatrices().translate(this.solstice$naturalX, this.solstice$naturalY);
+        context.getMatrices().scale(scale, scale);
+        context.getMatrices().translate(-this.solstice$naturalX, -this.solstice$naturalY);
 
-        context.fill(x1 + this.solstice$deltaX, y1 + this.solstice$deltaY,
-                x2 + this.solstice$deltaX, y2 + this.solstice$deltaY, color);
+        if (!this.solstice$hidden) {
+            context.fill(x1, y1, x2, y2, color);
+        }
     }
 
     @Redirect(method = TARGET, at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V", ordinal = 1))
     private void solstice$onBodyFill(DrawContext context, int x1, int y1, int x2, int y2, int color) {
-        context.fill(x1 + this.solstice$deltaX, y1 + this.solstice$deltaY,
-                x2 + this.solstice$deltaX, y2 + this.solstice$deltaY, color);
+        int naturalH = y2 - this.solstice$naturalTopY;
+        com.example.solstice.ui.ScoreboardHudElement.recordRealNaturalBounds(
+                this.solstice$naturalX, this.solstice$naturalY, this.solstice$naturalW, naturalH);
+
+        if (!this.solstice$hidden) {
+            context.fill(x1, y1, x2, y2, color);
+        }
     }
 
     @Redirect(method = TARGET, at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/DrawContext;drawText(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;IIIZ)V"))
     private void solstice$onDrawText(DrawContext context, TextRenderer renderer, Text text, int x, int y, int color, boolean shadow) {
-        context.drawText(renderer, text, x + this.solstice$deltaX, y + this.solstice$deltaY, color, shadow);
+        if (!this.solstice$hidden) {
+            context.drawText(renderer, text, x, y, color, shadow);
+        }
     }
 
     @Inject(method = TARGET, at = @At("RETURN"))

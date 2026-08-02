@@ -3,6 +3,9 @@ package com.example.solstice.ui;
 import com.example.solstice.core.hud.HudElement;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.scoreboard.ScoreboardDisplaySlot;
+import net.minecraft.scoreboard.Team;
 
 /**
  * Editor-only stand-in for the scoreboard sidebar - the real position/scale
@@ -11,30 +14,33 @@ import net.minecraft.client.gui.DrawContext;
  * "scoreboard"}) directly out of {@link com.example.solstice.core.hud.HudLayoutManager}
  * during {@code InGameHud}'s own render pass, not from this class's own
  * {@link #render} - that Mixin redirects vanilla's real draw calls in
- * place, it doesn't call back into this element at all. This exists so the
- * scoreboard has a draggable/resizable box in {@code HudEditorScreen} like
- * every other {@link HudElement}; its own {@code render} draws a realistic
- * example (title + a few name/score rows, styled like vanilla's real
- * sidebar) rather than a plain placeholder, so positioning it doesn't
- * require actually being on a server with a live scoreboard objective.
+ * place, it doesn't call back into this element at all.
  *
- * <p><b>Real bug, fixed</b>: {@code getDefaultX}/{@code getDefaultY} used to
- * be a static formula guess, but vanilla's actual anchor position depends on
- * the real scoreboard's own content width (varies with the longest name/
- * score on screen) - a value only knowable from an actual live render, not
- * derivable from a formula. Since the editor showed the box at the guessed
- * position while the real Mixin computed its delta against the true,
- * content-dependent position, dragging the box to a spot in the editor and
- * the real scoreboard ending up somewhere else entirely were two different,
- * inconsistent baselines - "correct" in isolation, but never agreeing with
- * each other. Fixed by having {@code InGameHudScoreboardMixin} cache the
- * real natural position/width it computes on every actual render via {@link
- * #recordRealNaturalBounds}, and using that here whenever it's available -
- * matching the exact same baseline the real Mixin uses, so a drag in the
- * editor now lands the real scoreboard in the same spot. Falls back to the
- * old static guess only if no real scoreboard has rendered yet this
- * session (e.g. the editor opened before ever joining a world with an
- * active objective).</p>
+ * <p>{@link #hasLiveScoreboard()} independently re-resolves the real sidebar
+ * objective every call (same algorithm vanilla's own {@code
+ * InGameHud.renderScoreboardSidebar(DrawContext, RenderTickCounter)} uses
+ * to pick between a team-colored slot and the plain sidebar slot, confirmed
+ * via decompile) rather than trusting a cache that only updates when the
+ * Mixin's own render call actually fires - that render call is skipped
+ * entirely both when there's genuinely no objective (solo world, or a
+ * server that just doesn't use one) AND, previously, whenever the element
+ * was toggled off in the editor, which meant re-opening the editor to turn
+ * a hidden scoreboard back on showed stale/default bounds instead of where
+ * it would really be. The Mixin no longer skips its own bounds computation
+ * while hidden (see its own Javadoc), so the cache this class reads is
+ * always fresh for the current frame whenever a real objective exists,
+ * independent of the visibility toggle.</p>
+ *
+ * <p>When a real objective exists, {@link #render} deliberately draws
+ * nothing - the real scoreboard is already rendering behind {@code
+ * HudEditorScreen} every frame (vanilla's own HUD render pass isn't gated
+ * on whether a Screen is open, confirmed via decompile), at the exact
+ * position/size this element reports through {@link #getDefaultX}/{@link
+ * #getDefaultY}/{@link #getWidth()}/{@link #getHeight()} - drawing a second
+ * copy here would just duplicate it. The placeholder (title + a few
+ * example name/score rows, styled like vanilla's real sidebar) only draws
+ * when there's genuinely nothing real to show instead, so positioning it
+ * still works before ever joining a world with an active objective.</p>
  */
 public final class ScoreboardHudElement implements HudElement {
 
@@ -46,38 +52,66 @@ public final class ScoreboardHudElement implements HudElement {
 
     private static final int HEADER_H = 10;
     private static final int LINE_H = 9;
-    private static final int WIDTH = 120;
+    private static final int PLACEHOLDER_WIDTH = 120;
 
-    private static boolean hasRealBounds;
-    private static int realNaturalX, realNaturalY, realNaturalW;
+    private static int realNaturalX, realNaturalY, realNaturalW, realNaturalH;
 
     private ScoreboardHudElement() {}
 
     public static ScoreboardHudElement getInstance() { return INSTANCE; }
 
-    /** Called by {@code InGameHudScoreboardMixin} every time the real scoreboard actually renders. */
-    public static void recordRealNaturalBounds(int naturalX, int naturalY, int naturalW) {
-        hasRealBounds = true;
+    /** Called by {@code InGameHudScoreboardMixin} every time it runs, whether or not it's actually drawing. */
+    public static void recordRealNaturalBounds(int naturalX, int naturalY, int naturalW, int naturalH) {
         realNaturalX = naturalX;
         realNaturalY = naturalY;
         realNaturalW = naturalW;
+        realNaturalH = naturalH;
+    }
+
+    /**
+     * Whether a real sidebar-displayed scoreboard objective exists right
+     * now - independently re-resolved every call (not cached), matching
+     * vanilla's own team-slot-then-plain-sidebar-slot resolution order.
+     */
+    public static boolean hasLiveScoreboard() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null || client.player == null) return false;
+
+        Scoreboard scoreboard = client.world.getScoreboard();
+        Team team = scoreboard.getScoreHolderTeam(client.player.getNameForScoreboard());
+        if (team != null) {
+            ScoreboardDisplaySlot teamSlot = ScoreboardDisplaySlot.fromFormatting(team.getColor());
+            if (teamSlot != null && scoreboard.getObjectiveForSlot(teamSlot) != null) {
+                return true;
+            }
+        }
+        return scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR) != null;
     }
 
     @Override public String getId()          { return "scoreboard"; }
     @Override public String getDisplayName() { return "Scoreboard"; }
-    @Override public int getWidth()          { return hasRealBounds ? realNaturalW : WIDTH; }
-    @Override public int getHeight()         { return HEADER_H + EXAMPLE_NAMES.length * LINE_H + 4; }
+    @Override public boolean hasLiveNaturalAnchor() { return true; }
+
+    @Override
+    public int getWidth() {
+        return hasLiveScoreboard() ? realNaturalW : PLACEHOLDER_WIDTH;
+    }
+
+    @Override
+    public int getHeight() {
+        return hasLiveScoreboard() ? realNaturalH : HEADER_H + EXAMPLE_NAMES.length * LINE_H + 4;
+    }
 
     @Override
     public int getDefaultX(int screenWidth, int screenHeight) {
-        if (hasRealBounds) return realNaturalX;
+        if (hasLiveScoreboard()) return realNaturalX;
         // Vanilla anchors the real sidebar to the right edge of the screen.
-        return screenWidth - WIDTH - 3;
+        return screenWidth - PLACEHOLDER_WIDTH - 3;
     }
 
     @Override
     public int getDefaultY(int screenWidth, int screenHeight) {
-        if (hasRealBounds) return realNaturalY;
+        if (hasLiveScoreboard()) return realNaturalY;
         // Vanilla anchors the panel's bottom edge to screenHeight/2 + rowCount*3, growing upward
         // by rowCount*9 for the entry rows plus a 10px header - confirmed via decompiling
         // InGameHud.renderScoreboardSidebar - so the real top-of-header y is
@@ -88,6 +122,12 @@ public final class ScoreboardHudElement implements HudElement {
 
     @Override
     public void render(DrawContext context, int x, int y) {
+        if (hasLiveScoreboard()) {
+            // Already rendering behind this screen via InGameHudScoreboardMixin - see this
+            // class's own Javadoc for why drawing anything here would just duplicate it.
+            return;
+        }
+
         MinecraftClient client = MinecraftClient.getInstance();
         int w = getWidth();
         int h = getHeight();
