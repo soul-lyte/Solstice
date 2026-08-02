@@ -19,29 +19,31 @@ import java.util.Optional;
 /**
  * Toggle + hold-keys for the real icon-grid container tooltip - ported to
  * match MisterPeModder/ShulkerBoxTooltip's own real trigger system (MIT,
- * see NOTICE.md), then reworked into a three-key combo per direct request:
- * holding {@link #previewKeyCode} (default Left Shift) alone shows a
- * compact, merged-and-deduplicated preview; holding it together with
- * {@link #fullPreviewKeyCode} (default Left Control) shows the full grid
- * (every slot in its real position, including empty ones); holding all
- * three (also {@link #lockKeyCode}, default Right Control) locks the last
- * full preview in place so the mouse can move away. None of the three
- * defaults is Alt - Left Alt held with Left Shift is the Windows keyboard-
- * layout-switch shortcut, and an earlier default collided with it directly
- * (see the config-key Javadocs below). See {@code
- * ShulkerTooltipDataMixin} for where the compact/full data is built, and
- * {@code HandledScreenLockOverlayMixin} for where the locked preview
- * actually gets drawn once the mouse is no longer over the original item.
+ * see NOTICE.md), then reworked into a two-key combo per direct request
+ * (a separate third "Lock Key" defaulted to Right Control, which - held
+ * together with Left Shift and Left Control - was physically unreachable
+ * with one hand): holding {@link #previewKeyCode} (default Left Shift)
+ * alone shows a compact, merged-and-deduplicated preview; holding it
+ * together with {@link #fullPreviewKeyCode} (default Left Control) shows
+ * the full grid (every slot in its real position, including empty ones)
+ * AND arms it for locking - the moment the live hover-driven preview stops
+ * updating on its own (mouse moves off the item, or Shift is released)
+ * while Control is still held, the last full-grid snapshot freezes in
+ * place, no third key needed. Releasing Control clears the lock. See
+ * {@code ShulkerTooltipDataMixin} for where the compact/full data is
+ * built, and {@code HandledScreenLockOverlayMixin} for where the locked
+ * preview actually gets drawn once the mouse is no longer over the
+ * original item.
  *
  * <p>Deliberately NOT real vanilla {@code KeyBinding}s - registering one
  * via {@code KeyBindingHelper} makes Fabric API list it in vanilla's own
- * Controls screen automatically, and per explicit request these three
- * hold-keys should only ever be rebindable from Solstice's own settings
- * (leaving just "Open Solstice Settings" and "Zoom" in vanilla's Controls
- * menu). Instead, each is a raw GLFW keycode persisted directly through
- * {@link ConfigManager}, polled the same way vanilla itself polls Shift/Alt
- * (see {@link #isKeyHeld(int)}) - no {@code KeyBinding} object, no
- * accessor, no vanilla options.txt entry at all.</p>
+ * Controls screen automatically, and per explicit request these hold-keys
+ * should only ever be rebindable from Solstice's own settings (leaving
+ * just "Open Solstice Settings" and "Zoom" in vanilla's Controls menu).
+ * Instead, each is a raw GLFW keycode persisted directly through {@link
+ * ConfigManager}, polled the same way vanilla itself polls Shift/Alt (see
+ * {@link #isKeyHeld(int)}) - no {@code KeyBinding} object, no accessor, no
+ * vanilla options.txt entry at all.</p>
  *
  * <p>Not ported from the original mod: colored preview backgrounds (a
  * whole per-item-category color registry) and short-form item counts
@@ -54,22 +56,20 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
 
     private static final String PREVIEW_KEY_CONFIG = "shulker.preview_key_code";
     /**
-     * Config keys bumped to "_v2" - Left Alt (the old Full Preview default) held
+     * Config key bumped to "_v2" - Left Alt (the old Full Preview default) held
      * together with Left Shift (Compact) is the exact Windows "switch keyboard
-     * layout" shortcut, confirmed by direct report. Since these are raw GLFW
-     * codes persisted straight through ConfigManager (not real KeyBindings),
+     * layout" shortcut, confirmed by direct report. Since this is a raw GLFW
+     * code persisted straight through ConfigManager (not a real KeyBinding),
      * changing the coded default alone would never migrate an already-persisted
      * value - same class of gotcha as the vanilla-KeyBinding case documented
      * elsewhere in this project, just needing a config-key bump instead of a
-     * translation-key bump. Neither new default uses Alt at all, so no
-     * combination of these three keys can ever match that shortcut again.
+     * translation-key bump. The new default doesn't use Alt at all, so this
+     * combo can never match that shortcut again.
      */
     private static final String FULL_PREVIEW_KEY_CONFIG = "shulker.full_preview_key_code_v2";
-    private static final String LOCK_KEY_CONFIG = "shulker.lock_key_code_v2";
 
     private int previewKeyCode = GLFW.GLFW_KEY_LEFT_SHIFT;
     private int fullPreviewKeyCode = GLFW.GLFW_KEY_LEFT_CONTROL;
-    private int lockKeyCode = GLFW.GLFW_KEY_RIGHT_CONTROL;
 
     /** The last stack+data seen while full preview (Shift+Control) was actually active - the "arming" snapshot a lock freezes from. */
     private ItemStack armedStack = ItemStack.EMPTY;
@@ -137,14 +137,9 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
                         this::rebindPreview),
                 new ModuleSetting.KeySetting(
                         "Full Preview Key",
-                        "Hold with the Compact Preview Key for the full grid (every slot, including empty ones). Also hold the Lock Key to freeze the preview in place.",
+                        "Hold with the Compact Preview Key for the full grid (every slot, including empty ones). Keep holding this alone after the mouse leaves the item (or Compact Preview is released) to lock the preview in place.",
                         () -> keyLabel(fullPreviewKeyCode),
-                        this::rebindFullPreview),
-                new ModuleSetting.KeySetting(
-                        "Lock Key",
-                        "Hold together with the other two keys to lock the full preview in place, so the mouse can move away without it disappearing.",
-                        () -> keyLabel(lockKeyCode),
-                        this::rebindLock)
+                        this::rebindFullPreview)
         );
     }
 
@@ -153,7 +148,6 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
         ConfigManager cfg = ConfigManager.getInstance();
         previewKeyCode = cfg.getInt(PREVIEW_KEY_CONFIG, GLFW.GLFW_KEY_LEFT_SHIFT);
         fullPreviewKeyCode = cfg.getInt(FULL_PREVIEW_KEY_CONFIG, GLFW.GLFW_KEY_LEFT_CONTROL);
-        lockKeyCode = cfg.getInt(LOCK_KEY_CONFIG, GLFW.GLFW_KEY_RIGHT_CONTROL);
     }
 
     private void rebindPreview(int keyCode) {
@@ -166,11 +160,6 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
         ConfigManager.getInstance().set(FULL_PREVIEW_KEY_CONFIG, keyCode);
     }
 
-    private void rebindLock(int keyCode) {
-        lockKeyCode = keyCode;
-        ConfigManager.getInstance().set(LOCK_KEY_CONFIG, keyCode);
-    }
-
     public boolean isPreviewKeyHeld() {
         return isKeyHeld(previewKeyCode);
     }
@@ -179,15 +168,11 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
         return isKeyHeld(fullPreviewKeyCode);
     }
 
-    public boolean isLockKeyHeld() {
-        return isKeyHeld(lockKeyCode);
-    }
-
     /**
      * Called from {@code ShulkerTooltipDataMixin} every frame the full
      * (Shift+Control) preview is actually showing over a real container item -
-     * keeps a live snapshot so a lock (also holding the Lock Key) has
-     * something recent to freeze.
+     * keeps a live snapshot so a lock (keeping Control held after the live
+     * preview stops updating) has something recent to freeze.
      */
     public void recordFullPreviewFrame(ItemStack stack, ShulkerTooltipData data) {
         this.armedStack = stack;
@@ -199,22 +184,22 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
      * Called every frame from {@code HandledScreenLockOverlayMixin}
      * (which has real screen-space mouse coordinates, unlike the
      * tooltip-data Mixin), passing the identity of the currently
-     * rendering screen. Releasing the Lock Key clears everything, and so
-     * does the screen identity changing - without this, closing the
+     * rendering screen. Releasing the Full Preview Key clears everything,
+     * and so does the screen identity changing - without this, closing the
      * shulker box that was being hover-previewed and opening a
-     * *different* one (or the same one for real) while still holding the
-     * lock combo would keep the old, now-stale snapshot locked and draw
-     * it on top of whatever new screen just opened, including a real
-     * container's own slot grid (confirmed in-game: it rendered as extra
-     * empty rows glued directly under a genuinely-opened shulker box's
-     * real 3-row inventory). Otherwise, as long as the Lock Key is held
-     * (together with the other two, which is what actually arms a
-     * snapshot in the first place), the last armed snapshot is frozen and
+     * *different* one (or the same one for real) while still holding it
+     * would keep the old, now-stale snapshot locked and draw it on top of
+     * whatever new screen just opened, including a real container's own
+     * slot grid (confirmed in-game: it rendered as extra empty rows glued
+     * directly under a genuinely-opened shulker box's real 3-row
+     * inventory). Otherwise, as long as the Full Preview Key is held
+     * (which is also what arms a snapshot in the first place, together
+     * with the Compact Preview Key), the last armed snapshot is frozen and
      * kept on screen the moment the normal hover-driven preview stops
      * updating on its own - whether because the mouse left the item or
-     * because a key was released - so holding all three together already
-     * behaves as "locked" the instant the mouse wanders off, with no
-     * extra key release required.
+     * because the Compact Preview Key was released - so simply keeping
+     * Control held after that already behaves as "locked", with no
+     * separate key needed.
      */
     public void tickLockState(Object screenIdentity, int mouseX, int mouseY) {
         if (screenIdentity != armedScreenIdentity) {
@@ -225,7 +210,7 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
             lockedStack = ItemStack.EMPTY;
             lockedData = null;
         }
-        if (!isLockKeyHeld()) {
+        if (!isFullPreviewKeyHeld()) {
             lockedStack = ItemStack.EMPTY;
             lockedData = null;
             armedStack = ItemStack.EMPTY;
@@ -250,34 +235,30 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
         if (lockedStack.isEmpty() || lockedData == null) {
             return Optional.empty();
         }
-        return Optional.of(new LockedPreview(lockedData, lockedX, lockedY));
+        return Optional.of(new LockedPreview(lockedStack, lockedData, lockedX, lockedY));
     }
 
-    public record LockedPreview(ShulkerTooltipData data, int x, int y) {}
+    public record LockedPreview(ItemStack stack, ShulkerTooltipData data, int x, int y) {}
 
     /**
      * The orange hover hint shown alongside the "Contains N Stacks"
      * summary (see {@code ContainerComponentAppendTooltipMixin}), guiding
      * the user through the states: nothing held, compact preview, full
-     * preview, locked.
+     * preview (armed for locking), locked.
      */
     public Text getHoverHintText() {
         boolean compactHeld = isPreviewKeyHeld();
         boolean fullHeld = isFullPreviewKeyHeld();
-        boolean lockHeld = isLockKeyHeld();
         String previewLabel = keyLabel(previewKeyCode);
         String fullLabel = keyLabel(fullPreviewKeyCode);
-        String lockLabel = keyLabel(lockKeyCode);
 
         String message;
-        if (compactHeld && fullHeld && lockHeld) {
-            message = lockLabel + " : Locked";
-        } else if (compactHeld && fullHeld) {
-            message = lockLabel + " : Lock Preview";
+        if (compactHeld && fullHeld) {
+            message = "Release " + previewLabel + " to Lock";
         } else if (compactHeld) {
             message = previewLabel + " + " + fullLabel + " : View Full Content";
-        } else if (lockHeld && !lockedStack.isEmpty()) {
-            message = lockLabel + " : Locked";
+        } else if (fullHeld && !lockedStack.isEmpty()) {
+            message = "Release " + fullLabel + " to Unlock";
         } else {
             message = previewLabel + " : Preview Content";
         }
