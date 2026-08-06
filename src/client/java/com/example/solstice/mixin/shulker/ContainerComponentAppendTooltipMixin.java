@@ -7,6 +7,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,8 +26,9 @@ import java.util.stream.Stream;
  * user what to press.
  *
  * <p>Empty containers are a special case, per explicit spec: an empty
- * shulker box still says "Contains 0 Stacks" but never shows the preview
- * hint (nothing to preview); every other empty container (chest, hopper,
+ * shulker box shows a light grey "Empty" (not the white "Contains 0
+ * Stacks" summary non-empty ones get) and never shows the preview hint
+ * (nothing to preview); every other empty container (chest, hopper,
  * barrel, etc.) says nothing at all - no summary, no hint. A non-empty
  * container of any kind behaves identically to a non-empty shulker box.
  * "Is this a shulker box" comes from {@link
@@ -49,7 +51,7 @@ public abstract class ContainerComponentAppendTooltipMixin {
         long stackCount = streamNonEmpty().count();
         if (stackCount == 0) {
             if (module.isCurrentStackShulkerBox()) {
-                textConsumer.accept(Text.literal("Contains 0 Stacks"));
+                textConsumer.accept(Text.literal("Empty").formatted(Formatting.GRAY));
             }
             // Every other empty container (chest, hopper, barrel, ...) says nothing at all.
             ci.cancel();

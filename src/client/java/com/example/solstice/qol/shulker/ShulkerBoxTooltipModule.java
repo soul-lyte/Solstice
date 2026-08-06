@@ -88,6 +88,20 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
     private int lockedY;
 
     /**
+     * The mouse position from the most recent frame the live preview was
+     * genuinely showing ({@link #armedThisFrame} true) - captured every such
+     * frame, not just at the moment a freeze actually triggers. A freeze can
+     * only be detected on the frame *after* the live preview stops (there's
+     * no way to know "this was the last live frame" until the next one
+     * fails to re-arm), and the mouse can keep moving in between - anchoring
+     * to the live position rather than whatever the mouse has drifted to by
+     * the detection frame is what keeps the locked box exactly where the
+     * real preview actually was.
+     */
+    private int lastArmedMouseX;
+    private int lastArmedMouseY;
+
+    /**
      * The stack currently being tooltip-processed, captured by {@code
      * ItemStackAppendComponentTooltipMixin} at the head of {@code
      * ItemStack.appendComponentTooltip} - the real vanilla call chain that
@@ -200,6 +214,13 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
      * because the Compact Preview Key was released - so simply keeping
      * Control held after that already behaves as "locked", with no
      * separate key needed.
+     *
+     * <p>Must run after this frame's deferred tooltip elements have already
+     * flushed (see the caller for why) - otherwise {@link #armedThisFrame}
+     * here is always reading last frame's value, one frame stale, which
+     * both delayed/occasionally-missed the lock trigger on a quick release
+     * and used a mouse position that no longer matched where the preview
+     * had actually been.</p>
      */
     public void tickLockState(Object screenIdentity, int mouseX, int mouseY) {
         if (screenIdentity != armedScreenIdentity) {
@@ -209,6 +230,10 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
             armedThisFrame = false;
             lockedStack = ItemStack.EMPTY;
             lockedData = null;
+        }
+        if (armedThisFrame) {
+            lastArmedMouseX = mouseX;
+            lastArmedMouseY = mouseY;
         }
         if (!isFullPreviewKeyHeld()) {
             lockedStack = ItemStack.EMPTY;
@@ -225,8 +250,8 @@ public final class ShulkerBoxTooltipModule extends AbstractModule {
         } else if (lockedStack.isEmpty() && !armedStack.isEmpty()) {
             lockedStack = armedStack;
             lockedData = armedData;
-            lockedX = mouseX;
-            lockedY = mouseY;
+            lockedX = lastArmedMouseX;
+            lockedY = lastArmedMouseY;
         }
         armedThisFrame = false;
     }

@@ -9,6 +9,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -47,7 +48,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * CullMode#CONSERVATIVE} (the Balanced profile) only culls two narrow,
  * genuinely-never-a-problem cases - see that enum constant's own Javadoc -
  * and {@link CullMode#PRACTICE} culls every non-player entity outright, for
- * a PvP practice server where nothing else matters.</p>
+ * a PvP practice server where nothing else matters, except armor stands
+ * (real fixtures on practice servers - target dummies, hit markers, map
+ * decorations - explicitly exempted so they stay visible too).</p>
  *
  * <h2>{@link CullMode#AGGRESSIVE} occlusion detection</h2>
  *
@@ -209,7 +212,11 @@ public final class EntityCullingModule extends AbstractModule {
         if (entity instanceof PlayerEntity) return true;
 
         if (cullMode == CullMode.PRACTICE) {
-            // Nothing besides players matters here - no distance/occlusion check needed at all.
+            // Armor stands are exempt - explicit request, since players use them as real
+            // practice-server fixtures (target dummies, hit markers, map decorations) that
+            // need to stay visible even though nothing else non-player does under this mode.
+            if (entity instanceof ArmorStandEntity) return true;
+            // Nothing else besides players matters here - no distance/occlusion check needed.
             return false;
         }
         if (cullMode == CullMode.CONSERVATIVE) {

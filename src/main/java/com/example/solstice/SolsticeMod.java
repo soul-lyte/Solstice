@@ -30,7 +30,7 @@ public class SolsticeMod implements ModInitializer {
 
     public static final String MOD_ID   = "solstice";
     public static final String MOD_NAME = "Solstice";
-    public static final String VERSION  = "1.2.6-9";
+    public static final String VERSION  = "1.2.6-10";
     public static final Logger LOGGER   = LoggerFactory.getLogger(MOD_ID);
 
     private static SolsticeMod instance;
